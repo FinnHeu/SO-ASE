@@ -11,7 +11,7 @@ import cartopy.feature as cfeature
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 import numpy as np
 
-def create_map(ax, extent='global', land=True, coastline=True, lon_inc=30, lat_inc=5, tick_labels=True, circular=True):
+def create_map(ax, extent='global', land=True, coastline=True, lon_inc=30, lat_inc=5, tick_labels=True, circular=True, zorder=1000):
     """
     Creates a map with optional land and coastline features, 
     gridlines.
@@ -34,6 +34,8 @@ def create_map(ax, extent='global', land=True, coastline=True, lon_inc=30, lat_i
             Whether to display longitude and latitude labels on the gridlines. Defaults to True.
         circular (bool, optional):
             Whether to apply a circular shape to the map. Defaults to True.
+        zorder (int, optional):
+            The z-order for the map features. Defaults to 1000.
 
     Returns:
         matplotlib.axes._subplots.AxesSubplot: 
@@ -67,9 +69,9 @@ def create_map(ax, extent='global', land=True, coastline=True, lon_inc=30, lat_i
 
     # add land/coastlines
     if land:
-        ax.add_feature(cfeature.LAND, color='lightgrey')
+        ax.add_feature(cfeature.LAND, color='lightgrey', zorder=zorder)
     if coastline:
-        ax.add_feature(cfeature.COASTLINE, color='black', linewidth=0.5)
+        ax.add_feature(cfeature.COASTLINE, color='black', linewidth=0.5, zorder=zorder)
 
     # add grid and grid labels
     gl = ax.gridlines(
@@ -81,6 +83,7 @@ def create_map(ax, extent='global', land=True, coastline=True, lon_inc=30, lat_i
         linestyle="--",
         x_inline=False,
         y_inline=True,
+        zorder=zorder+1
     )
 
     gl.xlocator = mticker.FixedLocator(range(-180, 180, lon_inc))
