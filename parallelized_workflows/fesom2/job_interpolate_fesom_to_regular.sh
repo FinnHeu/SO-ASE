@@ -31,7 +31,7 @@ lon_increment=1.0
 # Loop over years and run in parallel with logging
 for year in $(seq $year_start $year_end); do
     echo "Launching unrotation for year $year"
-    ~/micromamba/envs/pyfesom2_dev/bin/python interpolate_fesom_to_regular.py "$year" "$base_path_model" "$base_path_mesh" "$min_lat" "$max_lat" "$min_lon" "$max_lon" "$lat_increment" "$lon_increment" "$variables_to_interpolate" > "$LOG_DIR/interpolate_$year.log" 2>&1 &
+    ~/micromamba/envs/pyfesom2_dev/bin/python interpolate_fesom_to_regular.py "$year" "$base_path_model" "$base_path_mesh" "$min_lat" "$max_lat" "$min_lon" "$max_lon" "$lat_increment" "$lon_increment" $variables_to_interpolate > "$LOG_DIR/interpolate_$year.log" 2>&1 &
 done
 
 # Wait for all background jobs to complete
