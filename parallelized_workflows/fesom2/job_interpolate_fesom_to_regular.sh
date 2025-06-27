@@ -16,8 +16,8 @@ mkdir -p "$LOG_DIR"
 base_path_model="/albedo/work/user/ufoezk001/result/1stcycle/" # Directory containing model output
 base_path_mesh="~/mesh/Arc01/" # Directory containing FESOM2 mesh files
 dest_path="/albedo/work/user/ufoezk001/result/1stcycle/interpolated/" # Destination directory for interpolated data
-year_start=1979 # Starting year for unrotation
-year_end=2014 # Ending year for unrotation
+year_start=1979 # Starting year for interpolation
+year_end=2014 # Ending year for interpolation
 variables_to_interpolate="unod" "vnod" "temp" "salt" # Variables on nodes to interpolate
 
 # New parameters for latitude and longitude bounds and increments
@@ -30,7 +30,7 @@ lon_increment=1.0
 
 # Loop over years and run in parallel with logging
 for year in $(seq $year_start $year_end); do
-    echo "Launching unrotation for year $year"
+    echo "Launching interpolation for year $year"
     ~/micromamba/envs/pyfesom2_dev/bin/python interpolate_fesom_to_regular.py "$year" "$base_path_model" "$base_path_mesh" "$min_lat" "$max_lat" "$min_lon" "$max_lon" "$lat_increment" "$lon_increment" $variables_to_interpolate > "$LOG_DIR/interpolate_$year.log" 2>&1 &
 done
 
