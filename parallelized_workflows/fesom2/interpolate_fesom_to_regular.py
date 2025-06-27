@@ -1,42 +1,50 @@
 #!/usr/bin/env python3
+#!/usr/bin/env python3
 """
-Interpolate FESOM2 data on nodes to regular mesh
+Interpolate FESOM2 data on nodes to a regular lat/lon mesh
 
-This script interpolates FESOM2 data on nodes to a regular lat/lon mesh using `pyfesom2.fesom2regular()`.
-The interpolation is performed for all time steps and vertical levels in the input data.
+This script interpolates FESOM2 data on nodes to a regular latitude-longitude grid using
+`pyfesom2.fesom2regular()`. It processes all time steps and vertical levels in the input data
+for a given year and saves the interpolated output as NetCDF files.
 
 Author: Finn Heukamp
-Date: June 2024
+Updated: June 2025
 
 Usage:
-    python interpolate_fesom_to_regular.py <YEAR> <BASE_PATH_MODEL>
+    python interpolate_fesom_to_regular.py <YEAR> <BASE_PATH_MODEL> <BASE_PATH_MESH> \
+        <MIN_LAT> <MAX_LAT> <MIN_LON> <MAX_LON> <LAT_INCREMENT> <LON_INCREMENT> <VARIABLES...>
 
 Arguments:
-    <YEAR>  Year to process (e.g., 1995). Must match available input files:
-            - u.fesom.<YEAR>.nc
-            - v.fesom.<YEAR>.nc
-    
-    <BASE_PATH_MODEL>  Base path where the model output files are located.
+    <YEAR>            Year to process (e.g., 1995)
+    <BASE_PATH_MODEL> Base path where the model output files are located
+    <BASE_PATH_MESH>  Path to the FESOM2 mesh directory
+    <MIN_LAT>         Minimum latitude of the regular grid
+    <MAX_LAT>         Maximum latitude of the regular grid
+    <MIN_LON>         Minimum longitude of the regular grid
+    <MAX_LON>         Maximum longitude of the regular grid
+    <LAT_INCREMENT>   Latitude increment (e.g., 1.0)
+    <LON_INCREMENT>   Longitude increment (e.g., 1.0)
+    <VARIABLES...>    One or more variable names to interpolate (e.g., unod vnod temp salt)
 
 Dependencies:
-    - xarray
     - numpy
+    - xarray
     - pyfesom2
     - netCDF4 (for xarray backend)
-    - FESOM2 mesh diagnostics file: 'fesom.mesh.diag.nc'
 
 Input:
-    - FESOM files on nodes for the specified year
-    - Mesh diagnostics file with longitude and latitude information
+    - FESOM2 node-based NetCDF files for the specified year and variables
+    - FESOM2 mesh diagnostics file (typically: 'fesom.mesh.diag.nc')
 
 Output:
-    - Interpolated files:
-        - <variable>.interp.fesom.<YEAR>.nc
+    - Interpolated NetCDF files named:
+        <variable>.interp.<lon-range>E.<lat-range>N.fesom.<year>.nc
 
 Notes:
-    - This script is designed to be run in parallel for multiple years,
-      ideally on a single node with sufficient CPUs.
+    - Designed for parallel execution (e.g., over multiple years)
+    - Assumes data follows the naming pattern: <variable>.fesom.<year>.nc
 """
+
 import sys
 import xarray as xr
 import pyfesom2 as pf
