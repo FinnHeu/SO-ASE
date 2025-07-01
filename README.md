@@ -18,8 +18,8 @@ The `so_ase` Python module provides utilities for analyzing and visualizing Sout
 The `parallelized_workflows` subdirectory contains scripts for efficiently processing FESOM2 model outputs. These workflows are designed to run on high-performance computing systems using SLURM. Key features include:
 
 - **Parallelized Interpolation**: Scripts for interpolating model data onto regular grids.
-- **Customizable Parameters**: Latitude/longitude bounds, increments, and variables can be specified.
-- **Logging**: Detailed logs for each processing task to facilitate debugging.
+
+- **Parallelized Unrotating**: Scripts for unrotating model vector quantities.
 
 ### Usage
 
