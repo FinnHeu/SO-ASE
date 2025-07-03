@@ -48,7 +48,7 @@ import pyfesom2 as pf
 import numpy as np
 
 # Get inputs from command line arguments
-year = sys.argv[1] 
+year = sys.argv[1]
 year = int(year)
 print('Unrotating velocities for year: ' + str(year), flush=True)
 
@@ -84,17 +84,19 @@ vnod_unrot_array = np.ones_like(u_rot) * np.nan
 # Unrotate in Loop since pyfesom2.vec_rotate_r2g does only support 1D arrays
 # Loop over time and depth (nz1) and unrotate u and v
 for m in range(len(ds_urot.time)):
-    print('Unrotating time step: ' + str(m+1) + '/' + str(len(ds_urot.time)), flush=True)
+    print('Unrotating time step: ' + str(m+1) +
+          '/' + str(len(ds_urot.time)), flush=True)
     for d in range(len(ds_urot.nz1)):
 
-        u_unrot, v_unrot = pf.vec_rotate_r2g(50, 15, -90, lons, lats, u_rot[m,d,:], v_rot[m,d,:], flag=1)
+        u_unrot, v_unrot = pf.vec_rotate_r2g(
+            50, 15, -90, lons, lats, u_rot[m, d, :], v_rot[m, d, :], flag=1)
 
-        unod_unrot_array[m, d, :] = u_unrot[np.newaxis, np.newaxis,:]
-        vnod_unrot_array[m, d, :] = v_unrot[np.newaxis, np.newaxis,:]
+        unod_unrot_array[m, d, :] = u_unrot[np.newaxis, np.newaxis, :]
+        vnod_unrot_array[m, d, :] = v_unrot[np.newaxis, np.newaxis, :]
 
 # write to dataset
-ds_urot['u_unrot'] = (('time','nz1','nod2'), unod_unrot_array)
-ds_vrot['v_unrot'] = (('time','nz1','nod2'), vnod_unrot_array)
+ds_urot['u_unrot'] = (('time', 'nz1', 'nod2'), unod_unrot_array)
+ds_vrot['v_unrot'] = (('time', 'nz1', 'nod2'), vnod_unrot_array)
 
 # drop rotated velocities
 ds_u_unrot = ds_urot.drop_vars('u')
@@ -110,6 +112,3 @@ ds_v_unrot.to_netcdf(dst_file_v)
 print('Unrotated velocities saved to:', flush=True)
 print(dst_file_u, flush=True)
 print(dst_file_v, flush=True)
-
-    
-                           

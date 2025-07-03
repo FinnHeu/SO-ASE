@@ -1,15 +1,13 @@
 # so_ase/plotting_maps.py
 
 import matplotlib.pyplot as plt
-import cartopy.crs as ccrs
-
-import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import matplotlib.path as mpath
+import numpy as np
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
-import numpy as np
+
 
 def create_map(ax, extent='global', land=True, coastline=True, lon_inc=30, lat_inc=5, tick_labels=True, circular=True, zorder=1000):
     """
@@ -52,18 +50,21 @@ def create_map(ax, extent='global', land=True, coastline=True, lon_inc=30, lat_i
         elif extent == 'arctic_ocean':
             extent = [-180, 180, 65, 90]
         else:
-            raise ValueError("Invalid extent string. Use 'global', 'southern_ocean', or 'arctic_ocean'.")
-    
+            raise ValueError(
+                "Invalid extent string. Use 'global', 'southern_ocean', or 'arctic_ocean'.")
+
     # validate extent input
     elif not isinstance(extent, (list, tuple)) or len(extent) != 4:
-        raise ValueError("Extent must be a list or tuple of four values: [lon_min, lon_max, lat_min, lat_max].")
-    
+        raise ValueError(
+            "Extent must be a list or tuple of four values: [lon_min, lon_max, lat_min, lat_max].")
+
     if not all(isinstance(x, (int, float)) for x in extent):
         raise ValueError("Extent values must be numeric (int or float).")
-    
+
     if extent[0] >= extent[1] or extent[2] >= extent[3]:
-        raise ValueError("Invalid extent: lon_min must be less than lon_max and lat_min must be less than lat_max.")
-    
+        raise ValueError(
+            "Invalid extent: lon_min must be less than lon_max and lat_min must be less than lat_max.")
+
     # set map extent
     ax.set_extent(extent, crs=ccrs.PlateCarree())
 
@@ -71,7 +72,8 @@ def create_map(ax, extent='global', land=True, coastline=True, lon_inc=30, lat_i
     if land:
         ax.add_feature(cfeature.LAND, color='lightgrey', zorder=zorder)
     if coastline:
-        ax.add_feature(cfeature.COASTLINE, color='black', linewidth=0.5, zorder=zorder)
+        ax.add_feature(cfeature.COASTLINE, color='black',
+                       linewidth=0.5, zorder=zorder)
 
     # add grid and grid labels
     gl = ax.gridlines(
@@ -96,8 +98,9 @@ def create_map(ax, extent='global', land=True, coastline=True, lon_inc=30, lat_i
     # make plot circular
     if circular:
         ax = circular_shape(ax)
-    
+
     return ax
+
 
 def circular_shape(ax):
     """
