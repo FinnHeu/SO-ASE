@@ -12,7 +12,7 @@
 #micromamba /albedo/home/fheukamp/miniconda3/envs/BarentsSea
 
 # Output directory for logs
-LOG_DIR=logs_unrotate
+LOG_DIR=./logs/unrotate/nodes/
 mkdir -p "$LOG_DIR"
 
 ############ Define Parameters ############
