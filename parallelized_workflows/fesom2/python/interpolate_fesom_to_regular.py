@@ -67,7 +67,7 @@ lon_increment = float(sys.argv[9])
 variables = sys.argv[10:]  # Remaining arguments are variable names
 
 # Destination path for interpolated data
-dest_path = base_path_model + 'interpolated/'
+dest_path = base_path_model + "interpolated/"
 
 # Logging for confirmation
 print(f"Processing year: {year}")
@@ -106,27 +106,24 @@ for variable in variables:
     ds = xr.open_dataset(data_file)
 
     # allocate array
-    interp = np.zeros((len(lat), len(lon), nlevs,
-                      ds.dims['time']), dtype=np.float32) * np.nan
+    interp = (
+        np.zeros((len(lat), len(lon), nlevs, ds.dims["time"]), dtype=np.float32)
+        * np.nan
+    )
 
     for i in range(len(ds.time)):
-        print(
-            f"Processing time step {i+1}/{len(ds.time)} for variable {variable}")
+        print(f"Processing time step {i+1}/{len(ds.time)} for variable {variable}")
         for j in range(nlevs):
             print(
-                f"Processing vertical level {j+1}/{nlevs} for variable {variable} at time step {i+1}")
+                f"Processing vertical level {j+1}/{nlevs} for variable {variable} at time step {i+1}"
+            )
 
             # Extract the variable data for the current time step and vertical level
             data = ds[variable].isel(time=i, nz1=j).values
 
             # Interpolate to regular grid
             interp_2D = pf.fesom2regular(
-                data,
-                mesh,
-                lon_grid,
-                lat_grid,
-                how='nn',
-                dumpfile=True
+                data, mesh, lon_grid, lat_grid, how="nn", dumpfile=True
             )
 
             # Add vertical level and time dimension
@@ -134,15 +131,8 @@ for variable in variables:
 
     # Create a new xarray Dataset for the interpolated data)
     interp_ds = xr.Dataset(
-        {
-            variable: (['lat', 'lon', 'nz1', 'time'], interp)
-        },
-        coords={
-            'lon': lon,
-            'lat': lat,
-            'nz1': mesh_diag.nz1,
-            'time': ds.time
-        }
+        {variable: (["lat", "lon", "nz1", "time"], interp)},
+        coords={"lon": lon, "lat": lat, "nz1": mesh_diag.nz1, "time": ds.time},
     )
 
     # Save the interpolated data

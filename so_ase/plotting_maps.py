@@ -9,26 +9,36 @@ import cartopy.feature as cfeature
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 
 
-def create_map(ax, extent='global', land=True, coastline=True, lon_inc=30, lat_inc=5, tick_labels=True, circular=True, zorder=1000):
+def create_map(
+    ax,
+    extent="global",
+    land=True,
+    coastline=True,
+    lon_inc=30,
+    lat_inc=5,
+    tick_labels=True,
+    circular=True,
+    zorder=1000,
+):
     """
-    Creates a map with optional land and coastline features, 
+    Creates a map with optional land and coastline features,
     gridlines.
 
     Parameters:
-        ax (matplotlib.axes._subplots.AxesSubplot): 
+        ax (matplotlib.axes._subplots.AxesSubplot):
             The axes object to plot on.
-        extent (list or str, optional): 
-            The geographic extent of the map in the form [lon_min, lon_max, lat_min, lat_max] or str 'global', 'southern_ocean' or 'arctic_ocean'. 
+        extent (list or str, optional):
+            The geographic extent of the map in the form [lon_min, lon_max, lat_min, lat_max] or str 'global', 'southern_ocean' or 'arctic_ocean'.
             Defaults to 'global'.
-        land (bool, optional): 
+        land (bool, optional):
             Whether to add land features to the map. Defaults to True.
-        coastline (bool, optional): 
+        coastline (bool, optional):
             Whether to add coastlines to the map. Defaults to True.
-        lon_inc (int, optional): 
+        lon_inc (int, optional):
             Longitude grid interval. Defaults to 30.
-        lat_inc (int, optional): 
+        lat_inc (int, optional):
             Latitude grid interval. Defaults to 5.
-        tick_labels (bool, optional): 
+        tick_labels (bool, optional):
             Whether to display longitude and latitude labels on the gridlines. Defaults to True.
         circular (bool, optional):
             Whether to apply a circular shape to the map. Defaults to True.
@@ -36,44 +46,46 @@ def create_map(ax, extent='global', land=True, coastline=True, lon_inc=30, lat_i
             The z-order for the map features. Defaults to 1000.
 
     Returns:
-        matplotlib.axes._subplots.AxesSubplot: 
+        matplotlib.axes._subplots.AxesSubplot:
             The modified axes object with the Southern Ocean map.
     """
 
     # handle extent and circular input
     if isinstance(extent, str):
-        if extent == 'global':
+        if extent == "global":
             extent = [-180, 180, -90, 90]
             circular = False  # Global maps are not typically circular
-        elif extent == 'southern_ocean':
+        elif extent == "southern_ocean":
             extent = [-180, 180, -90, -40]
-        elif extent == 'arctic_ocean':
+        elif extent == "arctic_ocean":
             extent = [-180, 180, 65, 90]
         else:
             raise ValueError(
-                "Invalid extent string. Use 'global', 'southern_ocean', or 'arctic_ocean'.")
+                "Invalid extent string. Use 'global', 'southern_ocean', or 'arctic_ocean'."
+            )
 
     # validate extent input
     elif not isinstance(extent, (list, tuple)) or len(extent) != 4:
         raise ValueError(
-            "Extent must be a list or tuple of four values: [lon_min, lon_max, lat_min, lat_max].")
+            "Extent must be a list or tuple of four values: [lon_min, lon_max, lat_min, lat_max]."
+        )
 
     if not all(isinstance(x, (int, float)) for x in extent):
         raise ValueError("Extent values must be numeric (int or float).")
 
     if extent[0] >= extent[1] or extent[2] >= extent[3]:
         raise ValueError(
-            "Invalid extent: lon_min must be less than lon_max and lat_min must be less than lat_max.")
+            "Invalid extent: lon_min must be less than lon_max and lat_min must be less than lat_max."
+        )
 
     # set map extent
     ax.set_extent(extent, crs=ccrs.PlateCarree())
 
     # add land/coastlines
     if land:
-        ax.add_feature(cfeature.LAND, color='lightgrey', zorder=zorder)
+        ax.add_feature(cfeature.LAND, color="lightgrey", zorder=zorder)
     if coastline:
-        ax.add_feature(cfeature.COASTLINE, color='black',
-                       linewidth=0.5, zorder=zorder)
+        ax.add_feature(cfeature.COASTLINE, color="black", linewidth=0.5, zorder=zorder)
 
     # add grid and grid labels
     gl = ax.gridlines(
@@ -85,7 +97,7 @@ def create_map(ax, extent='global', land=True, coastline=True, lon_inc=30, lat_i
         linestyle="--",
         x_inline=False,
         y_inline=True,
-        zorder=zorder+1
+        zorder=zorder + 1,
     )
 
     gl.xlocator = mticker.FixedLocator(range(-180, 180, lon_inc))
@@ -104,18 +116,18 @@ def create_map(ax, extent='global', land=True, coastline=True, lon_inc=30, lat_i
 
 def circular_shape(ax):
     """
-    Clips the plotting area to a circular shape, typically used to create 
+    Clips the plotting area to a circular shape, typically used to create
     polar plots or maps with circular boundaries.
 
     Parameters:
-        ax (matplotlib.axes._subplots.AxesSubplot): 
+        ax (matplotlib.axes._subplots.AxesSubplot):
             The axes object to apply the circular boundary to.
 
     Returns:
-        matplotlib.axes._subplots.AxesSubplot: 
+        matplotlib.axes._subplots.AxesSubplot:
             The modified axes object with a circular clipping boundary.
     """
-    theta = np.linspace(0, 2*np.pi, 100)
+    theta = np.linspace(0, 2 * np.pi, 100)
     center, radius = [0.5, 0.5], 0.5
     verts = np.vstack([np.sin(theta), np.cos(theta)]).T
     circle = mpath.Path(verts * radius + center)
