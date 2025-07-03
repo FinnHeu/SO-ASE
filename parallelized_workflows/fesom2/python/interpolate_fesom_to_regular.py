@@ -66,7 +66,8 @@ lon_increment = float(sys.argv[9])
 
 variables = sys.argv[10:]  # Remaining arguments are variable names
 
-dest_path = base_path_model + 'interpolated/'  # Destination path for interpolated data
+# Destination path for interpolated data
+dest_path = base_path_model + 'interpolated/'
 
 # Logging for confirmation
 print(f"Processing year: {year}")
@@ -99,22 +100,25 @@ nlevs = len(mesh_diag.nz1)
 # Interpolate
 for variable in variables:
     print(f"Interpolating variable: {variable}")
-    
+
     # Load the variable data
     data_file = f"{base_path_model}{variable}.fesom.{year}.nc"
     ds = xr.open_dataset(data_file)
 
     # allocate array
-    interp = np.zeros((len(lat), len(lon), nlevs, ds.dims['time']), dtype=np.float32) * np.nan
-    
+    interp = np.zeros((len(lat), len(lon), nlevs,
+                      ds.dims['time']), dtype=np.float32) * np.nan
+
     for i in range(len(ds.time)):
-        print(f"Processing time step {i+1}/{len(ds.time)} for variable {variable}")
+        print(
+            f"Processing time step {i+1}/{len(ds.time)} for variable {variable}")
         for j in range(nlevs):
-            print(f"Processing vertical level {j+1}/{nlevs} for variable {variable} at time step {i+1}")
-            
+            print(
+                f"Processing vertical level {j+1}/{nlevs} for variable {variable} at time step {i+1}")
+
             # Extract the variable data for the current time step and vertical level
             data = ds[variable].isel(time=i, nz1=j).values
-            
+
             # Interpolate to regular grid
             interp_2D = pf.fesom2regular(
                 data,
@@ -125,8 +129,9 @@ for variable in variables:
                 dumpfile=True
             )
 
-            interp[:, :, j, i] = interp_2D[:,:]  # Add vertical level and time dimension
-        
+            # Add vertical level and time dimension
+            interp[:, :, j, i] = interp_2D[:, :]
+
     # Create a new xarray Dataset for the interpolated data)
     interp_ds = xr.Dataset(
         {
@@ -139,15 +144,11 @@ for variable in variables:
             'time': ds.time
         }
     )
-    
+
     # Save the interpolated data
     output_file = f"{dest_path}{variable}.interp.{min_lon}E.{max_lon}E.{lon_increment}E.{min_lat}N.{min_lat}N.{lat_increment}N.fesom.{year}.nc"
     interp_ds.to_netcdf(output_file)
-    
+
     print(f"Saved interpolated data to: {output_file}")
 
 print("Interpolation completed for all variables.")
-
-
-    
-                           
