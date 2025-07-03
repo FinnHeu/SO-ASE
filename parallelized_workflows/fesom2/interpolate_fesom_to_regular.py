@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-#!/usr/bin/env python3
 """
 Interpolate FESOM2 data on nodes to a regular lat/lon mesh
 
@@ -27,14 +25,15 @@ Arguments:
     <VARIABLES...>    One or more variable names to interpolate (e.g., unod vnod temp salt)
 
 Dependencies:
+    - os
+    - sys
     - numpy
     - xarray
     - pyfesom2
-    - netCDF4 (for xarray backend)
 
 Input:
     - FESOM2 node-based NetCDF files for the specified year and variables
-    - FESOM2 mesh diagnostics file (typically: 'fesom.mesh.diag.nc')
+    - FESOM2 mesh and meshdiagnostics file (typically: 'fesom.mesh.diag.nc')
 
 Output:
     - Interpolated NetCDF files named:
@@ -49,6 +48,8 @@ import sys
 import xarray as xr
 import pyfesom2 as pf
 import numpy as np
+from os.path import isdir
+from os import makedirs
 
 # Get inputs from command line arguments
 # Parse fixed arguments
@@ -65,28 +66,37 @@ lon_increment = float(sys.argv[9])
 
 variables = sys.argv[10:]  # Remaining arguments are variable names
 
+dest_path = base_path_model + 'interpolated/'  # Destination path for interpolated data
 
 # Logging for confirmation
 print(f"Processing year: {year}")
 print(f"Base path model: {base_path_model}")
 print(f"Base path mesh: {base_path_mesh}")
+print(f"Base path output: {dest_path}")
 print(f"Latitude bounds: {min_lat} to {max_lat} (step {lat_increment})")
 print(f"Longitude bounds: {min_lon} to {max_lon} (step {lon_increment})")
 print(f"Variables to interpolate: {variables}")
 
-# Example: Generate the lat/lon grid
-lat_grid = np.arange(min_lat, max_lat + lat_increment, lat_increment)
-lon_grid = np.arange(min_lon, max_lon + lon_increment, lon_increment)
+# Ensure the output directory exists
+if not isdir(dest_path):
+    print(f"Creating output directory: {dest_path}")
+    makedirs(dest_path)
 
-print(f"Generated grid: {len(lat_grid)} latitudes x {len(lon_grid)} longitudes")
+# Generate the lat/lon grid
+lat = np.arange(min_lat, max_lat + lat_increment, lat_increment)
+lon = np.arange(min_lon, max_lon + lon_increment, lon_increment)
+lon_grid, lat_grid = np.meshgrid(lon, lat)
 
-# Interpolate each variable
-mesh = pf.load_mesh(base_path_mesh)
+print(f"Generated grid: {len(lat)} latitudes x {len(lon)} longitudes")
+
+# Load Mesh
+mesh = pf.load_mesh(base_path_mesh, usepickle=False)
 mesh_diag = xr.open_dataset(f"{base_path_model}fesom.mesh.diag.nc")
 
 # Get number of vertical levels
 nlevs = len(mesh_diag.nz1)
 
+# Interpolate
 for variable in variables:
     print(f"Interpolating variable: {variable}")
     
@@ -95,7 +105,7 @@ for variable in variables:
     ds = xr.open_dataset(data_file)
 
     # allocate array
-    interp = np.zeros((len(lon_grid), len(lat_grid), nlevs, ds.dims['time']), dtype=np.float32) * np.nan
+    interp = np.zeros((len(lat), len(lon), nlevs, ds.dims['time']), dtype=np.float32) * np.nan
     
     for i in range(len(ds.time)):
         print(f"Processing time step {i+1}/{len(ds.time)} for variable {variable}")
@@ -103,7 +113,7 @@ for variable in variables:
             print(f"Processing vertical level {j+1}/{nlevs} for variable {variable} at time step {i+1}")
             
             # Extract the variable data for the current time step and vertical level
-            data = ds.isel(time=i, nz1=j).values.squeeze()
+            data = ds[variable].isel(time=i, nz1=j).values
             
             # Interpolate to regular grid
             interp_2D = pf.fesom2regular(
@@ -111,26 +121,27 @@ for variable in variables:
                 mesh,
                 lon_grid,
                 lat_grid,
-                how='nn'
+                how='nn',
+                dumpfile=True
             )
 
-            interp[:, :, j, i] = interp_2D[:,:, np.newaxis, np.newaxis]  # Add vertical level and time dimension
+            interp[:, :, j, i] = interp_2D[:,:]  # Add vertical level and time dimension
         
     # Create a new xarray Dataset for the interpolated data)
     interp_ds = xr.Dataset(
         {
-            variable: (['lon', 'lat', 'nz1', 'time'], interp)
+            variable: (['lat', 'lon', 'nz1', 'time'], interp)
         },
         coords={
-            'lon': lon_grid,
-            'lat': lat_grid,
+            'lon': lon,
+            'lat': lat,
             'nz1': mesh_diag.nz1,
             'time': ds.time
         }
     )
     
     # Save the interpolated data
-    output_file = f"{base_path_model}{variable}.interp.{min_lon}E.{max_lon}E.{lon_increment}E.{min_lat}N.{min_lat}N.{lat_increment}N.fesom.{year}.nc"
+    output_file = f"{dest_path}{variable}.interp.{min_lon}E.{max_lon}E.{lon_increment}E.{min_lat}N.{min_lat}N.{lat_increment}N.fesom.{year}.nc"
     interp_ds.to_netcdf(output_file)
     
     print(f"Saved interpolated data to: {output_file}")
