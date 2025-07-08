@@ -19,7 +19,7 @@ Arguments:
     <YEAR>  Year to process (e.g., 1995). Must match available input files:
             - u.fesom.<YEAR>.nc
             - v.fesom.<YEAR>.nc
-    
+
     <BASE_PATH_MODEL>  Base path where the model output files are located.
 
 Dependencies:
@@ -50,20 +50,20 @@ import numpy as np
 # Get inputs from command line arguments
 year = sys.argv[1]
 year = int(year)
-print('Unrotating velocities for year: ' + str(year), flush=True)
+print("Unrotating velocities for year: " + str(year), flush=True)
 
 base_path_model = sys.argv[2]
 base_path_model = str(base_path_model)
-print('Base path model: ' + base_path_model, flush=True)
-print('Output is written to the same path as the input files.', flush=True)
+print("Base path model: " + base_path_model, flush=True)
+print("Output is written to the same path as the input files.", flush=True)
 
 
 # load mesh_diag
-mesh_diag = xr.open_dataset(base_path_model + 'fesom.mesh.diag.nc')
+mesh_diag = xr.open_dataset(base_path_model + "fesom.mesh.diag.nc")
 
 # Files
-src_file_u = base_path_model + 'unod.fesom.' + str(year) + '.nc'
-src_file_v = base_path_model + 'vnod.fesom.' + str(year) + '.nc'
+src_file_u = base_path_model + "unod.fesom." + str(year) + ".nc"
+src_file_v = base_path_model + "vnod.fesom." + str(year) + ".nc"
 
 # Load rotated u and v
 ds_urot = xr.open_dataset(src_file_u)
@@ -84,31 +84,33 @@ vnod_unrot_array = np.ones_like(u_rot) * np.nan
 # Unrotate in Loop since pyfesom2.vec_rotate_r2g does only support 1D arrays
 # Loop over time and depth (nz1) and unrotate u and v
 for m in range(len(ds_urot.time)):
-    print('Unrotating time step: ' + str(m+1) +
-          '/' + str(len(ds_urot.time)), flush=True)
+    print(
+        "Unrotating time step: " + str(m + 1) + "/" + str(len(ds_urot.time)), flush=True
+    )
     for d in range(len(ds_urot.nz1)):
 
         u_unrot, v_unrot = pf.vec_rotate_r2g(
-            50, 15, -90, lons, lats, u_rot[m, d, :], v_rot[m, d, :], flag=1)
+            50, 15, -90, lons, lats, u_rot[m, d, :], v_rot[m, d, :], flag=1
+        )
 
         unod_unrot_array[m, d, :] = u_unrot[np.newaxis, np.newaxis, :]
         vnod_unrot_array[m, d, :] = v_unrot[np.newaxis, np.newaxis, :]
 
 # write to dataset
-ds_urot['u_unrot'] = (('time', 'nz1', 'nod2'), unod_unrot_array)
-ds_vrot['v_unrot'] = (('time', 'nz1', 'nod2'), vnod_unrot_array)
+ds_urot["u_unrot"] = (("time", "nz1", "nod2"), unod_unrot_array)
+ds_vrot["v_unrot"] = (("time", "nz1", "nod2"), vnod_unrot_array)
 
 # drop rotated velocities
-ds_u_unrot = ds_urot.drop_vars('u')
-ds_v_unrot = ds_vrot.drop_vars('v')
+ds_u_unrot = ds_urot.drop_vars("u")
+ds_v_unrot = ds_vrot.drop_vars("v")
 
 # to netcdf
-dst_file_u = base_path_model + 'unod_unrot.fesom.' + str(year) + '.nc'
-dst_file_v = base_path_model + 'vnod_unrot.fesom.' + str(year) + '.nc'
+dst_file_u = base_path_model + "unod_unrot.fesom." + str(year) + ".nc"
+dst_file_v = base_path_model + "vnod_unrot.fesom." + str(year) + ".nc"
 
 ds_u_unrot.to_netcdf(dst_file_u)
 ds_v_unrot.to_netcdf(dst_file_v)
 
-print('Unrotated velocities saved to:', flush=True)
+print("Unrotated velocities saved to:", flush=True)
 print(dst_file_u, flush=True)
 print(dst_file_v, flush=True)
