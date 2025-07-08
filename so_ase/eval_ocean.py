@@ -1,5 +1,8 @@
 # so_ase.eval_ocean.py
 
+import xarray as xr
+import numpy as np
+
 # To Do:
 # ocean volume transport (Drake Passage)
 # ocean heat content
