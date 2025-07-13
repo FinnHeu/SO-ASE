@@ -2,15 +2,24 @@
 
 import xarray as xr
 import numpy as np
+import pyfesom2 as pf
 
 # To Do:
-# ocean volume transport (Drake Passage)
-# ocean heat content
 # ocean temperature 50S-65S horizontal mean
 
-def fesom_ocean_heat_transport_as_residual(src_path, mesh_diag_path, ref_date='2000-01-31', eval_date='2002-01-31', box=[-180, 180, -90, -60], rho=1028, cp=4190, log=True):
+
+def fesom_ocean_heat_transport_as_residual(
+    src_path,
+    mesh_diag_path,
+    ref_date="2000-01-31",
+    eval_date="2002-01-31",
+    box=[-180, 180, -90, -60],
+    rho=1028,
+    cp=4190,
+    log=True,
+):
     """
-    Compute the ocean heat transport (OHT) into a region of interest during a particular period as the residual of the total surface heat flux during the period and ocean heat 
+    Compute the ocean heat transport (OHT) into a region of interest during a particular period as the residual of the total surface heat flux during the period and ocean heat
     content change between the first and last timestep of the period, using FESOM2 model output.
 
     Parameters
@@ -41,7 +50,7 @@ def fesom_ocean_heat_transport_as_residual(src_path, mesh_diag_path, ref_date='2
     Notes
     -----
     - The OHT is estimated as the residual of:
-      
+
       where:
         - ΔOHC is the change in ocean heat content between `ref_date` and `eval_date`
         - SHF is the surface heat flux (in W/m²)
@@ -50,45 +59,52 @@ def fesom_ocean_heat_transport_as_residual(src_path, mesh_diag_path, ref_date='2
     - This function assumes monthly-averaged data and uses fixed calendar days per month (non-leap year).
     """
     # Preprocess inputs
-    years = (int(ref_date.split('-')[0]), int(eval_date.split('-')[0]))
-    
+    years = (int(ref_date.split("-")[0]), int(eval_date.split("-")[0]))
+
     # Load mesh dignostic file
-    mesh_diag = xr.open_dataset(f'{mesh_diag_path}fesom.mesh.diag.nc')
+    mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
     if log:
-        print('Mesh diagnostics loaded:', flush=True)
-        print(f'{mesh_diag_path}fesom.mesh.diag.nc', flush=True)
+        print("Mesh diagnostics loaded:", flush=True)
+        print(f"{mesh_diag_path}fesom.mesh.diag.nc", flush=True)
 
     # Load files for surface heat flux from src_path
     files2load = [f"{src_path}fh.fesom.{y}.nc" for y in range(years[0], years[1])]
     ds_shf = xr.open_mfdataset(files2load).load()
-    if log: 
-        print('Files loaded:', flush=True)
-        for f in files2load: print(f'{f}', flush=True)
+    if log:
+        print("Files loaded:", flush=True)
+        for f in files2load:
+            print(f"{f}", flush=True)
 
     # Crop to examination period
     ds_shf = ds_shf.sel(time=slice(ref_date, eval_date))
-    if log: 
-        print(f'Cropped to: {ref_date} to {eval_date}', flush=True)
+    if log:
+        print(f"Cropped to: {ref_date} to {eval_date}", flush=True)
 
     # Load files for ocean temperature from src_path (only for the ref and eval year)
     files2load = [f"{src_path}temp.fesom.{y}.nc" for y in [years[0], years[1]]]
     ds_temp = xr.open_mfdataset(files2load).load()
-    if log: 
-        print('Files loaded:', flush=True)
-        for f in files2load: print(f'{f}', flush=True)
+    if log:
+        print("Files loaded:", flush=True)
+        for f in files2load:
+            print(f"{f}", flush=True)
 
     # Crop to examination period
-    ds_temp = ds_temp.sel(time=[ref_date, eval_date], method='nearest')
-    if log: 
-        print(f'Cropped to: {ref_date} / {eval_date}', flush=True)    
-        print(f'Timestamps: {ds_temp.time[0].values}, {ds_temp.time[1].values}') 
+    ds_temp = ds_temp.sel(time=[ref_date, eval_date], method="nearest")
+    if log:
+        print(f"Cropped to: {ref_date} / {eval_date}", flush=True)
+        print(f"Timestamps: {ds_temp.time[0].values}, {ds_temp.time[1].values}")
 
     # Add layerthickness and volumes to mesh_diag
-    mesh_diag['layer_thickness'] = (('nz1'), np.diff(mesh_diag.nz))
-    mesh_diag['volumes'] = mesh_diag.nod_area.isel(nz=0) * mesh_diag.layer_thickness
-    
+    mesh_diag["layer_thickness"] = (("nz1"), np.diff(mesh_diag.nz))
+    mesh_diag["volumes"] = mesh_diag.nod_area.isel(nz=0) * mesh_diag.layer_thickness
+
     # Find indices of nodes within the specified box
-    inds = np.where((mesh_diag.lon > box[0]) & (mesh_diag.lon < box[1]) & (mesh_diag.lat > box[2]) & (mesh_diag.lat < box[3]))[0]
+    inds = np.where(
+        (mesh_diag.lon > box[0])
+        & (mesh_diag.lon < box[1])
+        & (mesh_diag.lat > box[2])
+        & (mesh_diag.lat < box[3])
+    )[0]
 
     # Crop datasets to specified box
     ds_temp_cropped = ds_temp.isel(nod2=inds)
@@ -96,24 +112,28 @@ def fesom_ocean_heat_transport_as_residual(src_path, mesh_diag_path, ref_date='2
     mesh_diag_cropped = mesh_diag.isel(nod2=inds)
 
     # Compute ocean heat content change (OHC(eval_date) - OHC(ref_date))
-    OHC = (ds_temp_cropped.temp * rho * cp * mesh_diag_cropped.volumes).sum(dim=('nod2','nz1'))
+    OHC = (ds_temp_cropped.temp * rho * cp * mesh_diag_cropped.volumes).sum(
+        dim=("nod2", "nz1")
+    )
     deltaOHC = OHC.isel(time=-1) - OHC.isel(time=0)
 
     # Compute total number of seconds per month for total SHF computation
     days_in_month = np.array([31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31])
-    month_indices = ds_shf_cropped.time.dt.month.values - 1  # values already numpy array
+    month_indices = (
+        ds_shf_cropped.time.dt.month.values - 1
+    )  # values already numpy array
     seconds_per_month = days_in_month[month_indices] * 86500
-    ds_shf_cropped['seconds_per_month'] = (('time'), seconds_per_month)
+    ds_shf_cropped["seconds_per_month"] = (("time"), seconds_per_month)
 
-    # Compute total sum of the surface heat flux over the full examination period (SHF [W/m2] * seconds_per_month [s] * nodal area [m2]) 
-    SHF = (ds_shf_cropped.fh * ds_shf_cropped.seconds_per_month * mesh_diag_cropped.nod_area.isel(nz=0)).sum(dim='nod2')
-    sumSHF = SHF.sum(dim='time')
+    # Compute total sum of the surface heat flux over the full examination period (SHF [W/m2] * seconds_per_month [s] * nodal area [m2])
+    SHF = (
+        ds_shf_cropped.fh
+        * ds_shf_cropped.seconds_per_month
+        * mesh_diag_cropped.nod_area.isel(nz=0)
+    ).sum(dim="nod2")
+    sumSHF = SHF.sum(dim="time")
 
     # Compute the ocean heat transport as a residual (deltaOHC - sumSHF)
     OHT = deltaOHC - sumSHF
-    
+
     return OHT.values
-
-
-
-
