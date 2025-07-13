@@ -113,7 +113,11 @@ def fesom_ice_area(
 
 
 def fesom_ice_volume(
-    src_path, mesh_diag_path, years=(1979, 2015), box=[-180, 180, -90, -60], log=True
+    src_path, 
+    mesh_diag_path, 
+    years=(1979, 2015), 
+    box=[-180, 180, -90, -60], 
+    log=True
 ):
     """
     Compute total sea ice volume within a specified geographic bounding box using FESOM2 output.
