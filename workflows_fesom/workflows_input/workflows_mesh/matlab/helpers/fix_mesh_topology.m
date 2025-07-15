@@ -213,7 +213,7 @@ end
 %% Make a new mesh without the bottlenecks:
 
 % Truncate the mesh
-[Elements2d,ActiveNodes1,ThisIsBoundary]=TruncateMesh(Elements2d(ActiveElements,:),true(numvertices2d,1));
+[Elements2d,ActiveNodes1,ThisIsBoundary]=truncate_mesh(Elements2d(ActiveElements,:),true(numvertices2d,1));
 % Truncate the coordinate lists:
 X2d=X2d(ActiveNodes1);
 Y2d=Y2d(ActiveNodes1);
