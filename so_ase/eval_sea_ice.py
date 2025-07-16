@@ -66,47 +66,50 @@ def fesom_ice_area(
         print("Mesh diagnostics loaded:", flush=True)
         print(f"{mesh_diag_path}fesom.mesh.diag.nc", flush=True)
 
-    # Load files for sea ice concentration from src_path
-    files2load = [f"{src_path}a_ice.fesom.{y}.nc" for y in range(years[0], years[1])]
-    ds = xr.open_mfdataset(files2load).load()
-    if log:
-        print("Files loaded:", flush=True)
-        for f in files2load:
-            print(f"{f}", flush=True)
-    
-    if log:
-        print(f"Box {box[0]}E {box[1]}E {box[2]}N {box[3]}N")
-
     # Find indices of nodes within the specified box
     inds = find_nodes_in_box(mesh_diag_path, box=box, log=log)
-  
-    # Crop datasets
-    ds_cropped = ds.isel(nod2=inds)
-    mesh_diag_cropped = mesh_diag.isel(nod2=inds)
+      
+    # Load files for sea ice concentration from src_path
+    files2load = [f"{src_path}a_ice.fesom.{y}.nc" for y in range(years[0], years[1])]
 
-    # Create sea ice mask
-    ds_cropped["ice_mask"] = (
-        ("time", "nod2"),
-        np.where(ds_cropped.a_ice > aice_threshhold, True, False),
-    )
+    result = []
+    
+    for file in files2load:
+        ds = xr.open_dataset(file).load()
+        if log:
+            print(f"File loaded: {file}", flush=True)
+        
+        # Crop datasets
+        ds_cropped = ds.isel(nod2=inds)
+        mesh_diag_cropped = mesh_diag.isel(nod2=inds)
+    
+        # Create sea ice mask
+        ds_cropped["ice_mask"] = (
+            ("time", "nod2"),
+            np.where(ds_cropped.a_ice > aice_threshhold, True, False),
+        )
+    
+        # Sum over non-masked nodal areas
+        ds_cropped["sea_ice_area"] = (
+            ("time"),
+            (ds_cropped.ice_mask * mesh_diag_cropped.nod_area.isel(nz=0))
+            .sum(dim="nod2")
+            .values,
+        )
+    
+        # Prepare output
+        ds_cropped = ds_cropped.drop_vars(["a_ice", "ice_mask"])
+        ds_cropped.sea_ice_area.attrs["units"] = "$m^2$"
+        ds_cropped.sea_ice_area.attrs["long_name"] = "total sea ice area"
+        ds_cropped.sea_ice_area.attrs["bounding box"] = (
+            f"Longitude: {box[0]}E to {box[1]}E, Latitude: {box[2]}N to {box[3]}N"
+        )
 
-    # Sum over non-masked nodal areas
-    ds_cropped["sea_ice_area"] = (
-        ("time"),
-        (ds_cropped.ice_mask * mesh_diag_cropped.nod_area.isel(nz=0))
-        .sum(dim="nod2")
-        .values,
-    )
+        result.append(ds_cropped)
 
-    # Prepare output
-    ds_cropped = ds_cropped.drop_vars(["a_ice", "ice_mask"])
-    ds_cropped.sea_ice_area.attrs["units"] = "$m^2$"
-    ds_cropped.sea_ice_area.attrs["long_name"] = "total sea ice area"
-    ds_cropped.sea_ice_area.attrs["bounding box"] = (
-        f"Longitude: {box[0]}E to {box[1]}E, Latitude: {box[2]}N to {box[3]}N"
-    )
+    result = xr.concat(result, dim='time')
 
-    return ds_cropped
+    return result
 
 
 def fesom_ice_volume(
@@ -160,48 +163,45 @@ def fesom_ice_volume(
         print("Mesh diagnostics loaded:", flush=True)
         print(f"{mesh_diag_path}fesom.mesh.diag.nc", flush=True)
 
-    # Load files for sea ice concentration from src_path
-    files2load = [f"{src_path}a_ice.fesom.{y}.nc" for y in range(years[0], years[1])]
-    ds_aice = xr.open_mfdataset(files2load).load()
-    if log:
-        print("Files loaded:", flush=True)
-        for f in files2load:
-            print(f"{f}", flush=True)
-
-    # Load files for sea ice height from src_path
-    files2load = [f"{src_path}m_ice.fesom.{y}.nc" for y in range(years[0], years[1])]
-    ds_mice = xr.open_mfdataset(files2load).load()
-    if log:
-        print("Files loaded:", flush=True)
-        for f in files2load:
-            print(f"{f}", flush=True)
-
     # Find indices of nodes within the specified box
-    if log:
-        print(f"Box {box[0]}E {box[1]}E {box[2]}N {box[3]}N")
     inds = find_nodes_in_box(mesh_diag_path, box=box, log=log)
+
+    files2load_aice = [f"{src_path}a_ice.fesom.{y}.nc" for y in range(years[0], years[1])]
+    files2load_mice = [f"{src_path}m_ice.fesom.{y}.nc" for y in range(years[0], years[1])]
+
+    result = []
     
-    # Crop datasets
-    ds_aice_cropped = ds_aice.isel(nod2=inds)
-    ds_mice_cropped = ds_mice.isel(nod2=inds)
-    mesh_diag_cropped = mesh_diag.isel(nod2=inds)
+    for file1, file2 in zip(files2load_aice, files2load_mice):
+        # Load files for sea ice concentration from src_path
+        ds = xr.open_mfdataset([file1, file2]).load()
+        if log:
+            print(f"File loaded: {file1}", flush=True)
+            print(f"File loaded: {file2}", flush=True)
+            
+        # Crop datasets
+        ds_cropped = ds.isel(nod2=inds)
+        mesh_diag_cropped = mesh_diag.isel(nod2=inds, nz1=0)
+    
+        # Compute total ice volume (nodal area * nodal ice height * nodal ice concentration)
+        sea_ice_volume = (
+            mesh_diag_cropped.nod_area
+            * ds_cropped.m_ice
+            * ds_cropped.a_ice
+        ).sum(dim="nod2")
+    
+        # Sum over nodal areas
+        ds_cropped["sea_ice_volume"] = sea_ice_volume
+    
+        # Prepare output
+        ds_cropped = ds_cropped.drop_vars(["m_ice", "a_ice"])
+        ds_cropped.sea_ice_volume.attrs["units"] = "$m^3$"
+        ds_cropped.sea_ice_volume.attrs["long_name"] = "total sea ice volume"
+        ds_cropped.sea_ice_volume.attrs["bounding box"] = (
+            f"Longitude: {box[0]}E to {box[1]}E, Latitude: {box[2]}N to {box[3]}N"
+        )
 
-    # Compute total ice volume (nodal area * nodal ice height * nodal ice concentration)
-    sea_ice_volume = (
-        mesh_diag_cropped.nod_area.isel(nz=0)
-        * ds_mice_cropped.m_ice
-        * ds_aice_cropped.a_ice
-    ).sum(dim="nod2")
+        result.append(ds_cropped)
 
-    # Sum over nodal areas
-    ds_mice_cropped["sea_ice_volume"] = sea_ice_volume
+    result = xr.concat(result, dim='time')
 
-    # Prepare output
-    ds_mice_cropped = ds_mice_cropped.drop_vars(["m_ice"])
-    ds_mice_cropped.sea_ice_volume.attrs["units"] = "$m^3$"
-    ds_mice_cropped.sea_ice_volume.attrs["long_name"] = "total sea ice volume"
-    ds_mice_cropped.sea_ice_volume.attrs["bounding box"] = (
-        f"Longitude: {box[0]}E to {box[1]}E, Latitude: {box[2]}N to {box[3]}N"
-    )
-
-    return ds_mice_cropped
+    return result
