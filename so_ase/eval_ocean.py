@@ -3,6 +3,7 @@
 import xarray as xr
 import numpy as np
 import pyfesom2 as pf
+from .helpers_mesh import find_nodes_in_box
 
 # To Do:
 # ocean temperature 50S-65S horizontal mean
@@ -99,12 +100,7 @@ def fesom_ocean_heat_transport_as_residual(
     mesh_diag["volumes"] = mesh_diag.nod_area.isel(nz=0) * mesh_diag.layer_thickness
 
     # Find indices of nodes within the specified box
-    inds = np.where(
-        (mesh_diag.lon > box[0])
-        & (mesh_diag.lon < box[1])
-        & (mesh_diag.lat > box[2])
-        & (mesh_diag.lat < box[3])
-    )[0]
+    inds = find_nodes_in_box(mesh_diag_path, box=box, log=log)
 
     # Crop datasets to specified box
     ds_temp_cropped = ds_temp.isel(nod2=inds)
@@ -137,3 +133,82 @@ def fesom_ocean_heat_transport_as_residual(
     OHT = deltaOHC - sumSHF
 
     return OHT.values
+
+def fesom_timeseries_of_mean_vertical_profile_in_region(
+    src_path,
+    mesh_diag_path,
+    years=(1979, 2015),
+    box=[-180, 180, -90, -60],
+    varname='temp',
+    log=True
+):
+    """
+    Compute a time series of area-weighted mean vertical profiles for a specified region 
+    from FESOM2 model output.
+
+    Parameters:
+    -----------
+    src_path : str
+        Path to the directory containing annual FESOM2 output files (e.g., temp.fesom.YYYY.nc).
+    
+    mesh_diag_path : str
+        Path to the directory containing the mesh diagnostic file (fesom.mesh.diag.nc).
+    
+    years : tuple of int, optional
+        Start and end year for the time series. Default is (1979, 2015).
+    
+    box : list of float, optional
+        Geographic bounds of the region of interest in the format [lon_min, lon_max, lat_min, lat_max].
+        Default is global Southern Ocean: [-180, 180, -90, -60].
+    
+    varname : str, optional
+        Name of the variable to extract and average (must match variable name in NetCDF files).
+        Default is 'temp'.
+    
+    log : bool, optional
+        Whether to print progress information. Default is True.
+
+    Returns:
+    --------
+    xarray.DataSet
+        A time series of area-weighted mean vertical profiles in the specified region.
+        The vertical levels are preserved along the 'nz' dimension.
+    """
+    
+    # Find indices of nodes within the specified box
+    if log:
+        print(f"Box {box[0]}E {box[1]}E {box[2]}N {box[3]}N")
+    inds = find_nodes_in_box(mesh_diag_path, box=box, log=log)
+
+    mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
+    nodal_area = mesh_diag.nod_area.isel(nod2=inds, nz=0)
+    
+    mean_profiles = []
+
+    for year in years:
+        # Load file for each single year
+        file2load = f"{src_path}{varname}.fesom.{year}.nc"
+        ds = xr.open_dataset(file2load).isel(nod2=inds).load()
+        if log:
+            print(f"File loaded for year {year}:", flush=True)
+        
+        # Compute the area-weighted horizontal mean of all vertical profiles 
+        mean_profiles.append(ds.weighted(nodal_area).mean(dim='nod2'))
+    
+    n_samples_per_depth = (ds[varname].isel(time=0) != 0).sum(dim='nod2')
+    # Concatenate to one Dataset
+    ds_out = xr.concat(mean_profiles, dim='time')
+
+    return ds_out, n_samples_per_depth
+        
+
+        
+        
+        
+        
+        
+
+        
+
+        
+

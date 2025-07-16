@@ -69,3 +69,24 @@ def read_aux3d(meshpath):
             depths.append(d)
     depths = depths[num_levels:]  # Skip level header values
     return depths
+
+def find_nodes_in_box(
+        mesh_diag_path,
+        box=[-180, 180, -90, -60],
+        log=True
+):
+    """ """
+    mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
+    
+    # Find indices of nodes within the specified box
+    inds = np.where(
+        (mesh_diag.lon > box[0])
+        & (mesh_diag.lon < box[1])
+        & (mesh_diag.lat > box[2])
+        & (mesh_diag.lat < box[3])
+    )[0]
+    
+    if log:
+        print(f"Found {len(inds)} nodes in the specified box.", flush=True)
+    
+    return inds

@@ -10,6 +10,7 @@
 
 import xarray as xr
 import numpy as np
+from .helpers_mesh import find_nodes_in_box
 
 
 def fesom_ice_area(
@@ -72,17 +73,13 @@ def fesom_ice_area(
         print("Files loaded:", flush=True)
         for f in files2load:
             print(f"{f}", flush=True)
-
-    # Find indices of nodes within the specified box
-    inds = np.where(
-        (mesh_diag.lon > box[0])
-        & (mesh_diag.lon < box[1])
-        & (mesh_diag.lat > box[2])
-        & (mesh_diag.lat < box[3])
-    )[0]
+    
     if log:
         print(f"Box {box[0]}E {box[1]}E {box[2]}N {box[3]}N")
 
+    # Find indices of nodes within the specified box
+    inds = find_nodes_in_box(mesh_diag_path, box=box, log=log)
+  
     # Crop datasets
     ds_cropped = ds.isel(nod2=inds)
     mesh_diag_cropped = mesh_diag.isel(nod2=inds)
@@ -179,16 +176,11 @@ def fesom_ice_volume(
         for f in files2load:
             print(f"{f}", flush=True)
 
-    # Find indices of nmodes within the specified box
-    inds = np.where(
-        (mesh_diag.lon > box[0])
-        & (mesh_diag.lon < box[1])
-        & (mesh_diag.lat > box[2])
-        & (mesh_diag.lat < box[3])
-    )[0]
+    # Find indices of nodes within the specified box
     if log:
         print(f"Box {box[0]}E {box[1]}E {box[2]}N {box[3]}N")
-
+    inds = find_nodes_in_box(mesh_diag_path, box=box, log=log)
+    
     # Crop datasets
     ds_aice_cropped = ds_aice.isel(nod2=inds)
     ds_mice_cropped = ds_mice.isel(nod2=inds)
