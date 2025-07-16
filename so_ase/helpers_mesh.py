@@ -1,5 +1,8 @@
 # so_ase.helpers_mesh.py
 
+import xarray as xr
+import numpy as np
+
 def read_nodes(meshpath):
     """
     Reads 2D node coordinates from a `nod2d.out` file in a given mesh path.
