@@ -185,7 +185,7 @@ def fesom_timeseries_of_mean_vertical_profile_in_region(
     
     mean_profiles = []
 
-    for year in years:
+    for year in range(years[0], years[-1]):
         # Load file for each single year
         file2load = f"{src_path}{varname}.fesom.{year}.nc"
         ds = xr.open_mfdataset(file2load).isel(nod2=inds).load()
