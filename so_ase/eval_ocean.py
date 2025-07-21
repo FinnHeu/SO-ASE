@@ -190,13 +190,11 @@ def fesom_timeseries_of_mean_vertical_profile_in_region(
         file2load = f"{src_path}{varname}.fesom.{year}.nc"
         ds = xr.open_mfdataset(file2load).isel(nod2=inds).load()
         if log:
-            print(f"File loaded for year {year}:", flush=True)
+            print(f"File loaded: {file2load}", flush=True)
         
         # Compute the area-weighted horizontal mean of all vertical profiles 
         mean_profiles.append(ds.weighted(nodal_area).mean(dim='nod2'))
-        if log:
-            print(f"Computed mean profiles for year {year}", flush=True)
-            
+        
     # Concatenate to one Dataset
     ds_out = xr.concat(mean_profiles, dim='time')
 
