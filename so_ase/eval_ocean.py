@@ -194,12 +194,13 @@ def fesom_timeseries_of_mean_vertical_profile_in_region(
         
         # Compute the area-weighted horizontal mean of all vertical profiles 
         mean_profiles.append(ds.weighted(nodal_area).mean(dim='nod2'))
-    
-    n_samples_per_depth = (ds[varname].isel(time=0) != 0).sum(dim='nod2')
+        if log:
+            print(f"Computed mean profiles for year {year}", flush=True)
+            
     # Concatenate to one Dataset
     ds_out = xr.concat(mean_profiles, dim='time')
 
-    return ds_out, n_samples_per_depth
+    return ds_out
         
 
         
