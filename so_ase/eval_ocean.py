@@ -3,6 +3,8 @@
 import xarray as xr
 import numpy as np
 import pyfesom2 as pf
+from scipy.stats import linregress
+from scipy.interpolate import griddata
 from .helpers_mesh import find_nodes_in_box
 
 # To Do:
@@ -200,7 +202,168 @@ def fesom_timeseries_of_mean_vertical_profile_in_region(
 
     return ds_out
         
+def regression2D_fesom(src_path, mesh_diag_path, years=(2011, 2024), box=[-180, 180, -65, -55], varname='sic', grouping='annual.mean', grid_data=True, log=True, depth=None):
+    """
+    Perform linear regression on a FESOM2 variable over time at each unstructured grid node,
+    and optionally interpolate the regression results to a regular lon-lat grid.
 
+    Parameters
+    ----------
+    src_path : str
+        Path to the directory containing the FESOM2 NetCDF files.
+    mesh_diag_path : str
+        Path to the `fesom.mesh.diag.nc` file containing mesh diagnostics (node coordinates).
+    years : tuple of int, optional
+        Start and end year for the analysis (inclusive start, exclusive end). Default is (2011, 2024).
+    box : list of float, optional
+        Geographic bounding box [lon_min, lon_max, lat_min, lat_max] used to subset the mesh. Default is global Southern Ocean sector.
+    varname : str, optional
+        Variable name in the NetCDF files to be analyzed. Default is 'sic'.
+    grouping : str, optional
+        Temporal aggregation of the data before regression. Options are:
+        - 'annual.mean'
+        - 'annual.max'
+        - 'annual.min'
+        - 'monthly.mean' (automatically deseasonalized)
+    grid_data : bool, optional
+        If True, interpolates regression results to a regular lon-lat grid. Default is True.
+    log : bool, optional
+        If True, prints progress messages. Default is True.
+    depth : float or None, optional
+        If specified, selects a vertical level (in meters) using nearest match for 3D variables.
+
+    Returns
+    -------
+    result : xarray.Dataset
+        Dataset containing regression parameters:
+        - slope
+        - intercept
+        - rvalue
+        - pvalue
+        - stderr
+        - intercept_stderr
+        - lon and lat coordinates (if `grid_data` is False).
+
+        If `grid_data` is True, the dataset is on regular lat-lon grid;
+        otherwise, it's indexed by the unstructured mesh node coordinate `nod2`.
+
+    Notes
+    -----
+    - This function uses `scipy.stats.linregress` to perform regression at each node.
+    - Data is deseasonalized when using `monthly.mean`.
+    - When `grid_data=True`, `scipy.interpolate.griddata` is used for nearest neighbor spatial interpolation.
+
+    """
+    files2open = [f'{src_path}{varname}.fesom.{y}.nc' for y in range(years[0], years[-1])]
+    
+    inds = find_nodes_in_box(mesh_diag_path, box)
+
+    if log:
+        print('Loading files...')
+        if depth is not None:
+            print(f'Chosen depth level: {depth}m')
+            ds = xr.open_mfdataset(files2open).isel(nod2=inds).sel(nz1=depth, method='nearest').squeeze().load()
+        else:        
+            ds = xr.open_mfdataset(files2open).isel(nod2=inds).load()
+    if log:
+        for f in files2open:
+            print(f'Files loaded: {f}')
+    
+    ds = ds.transpose('time','nod2')
+    
+    freq, how = grouping.split('.')
+    if freq == 'annual':
+        if how == 'mean':
+            ds = ds.groupby('time.year').mean()
+        elif how == 'max':
+            ds = ds.groupby('time.year').max()
+        elif how == 'min':
+            ds = ds.groupby('time.year').min()
+        # Get time as float
+        x = ds.year.values
+    
+    elif freq == 'monthly':
+        if how != 'mean':
+            raise Warning('For monthly data no further grouping is allowed.')
+        # Deaseason
+        ds = ds.groupby('time.month') - ds.groupby('time.month').mean()
+        # Get time as float
+        x = ds.time.dt.year.values + np.tile(np.arange(0,1,1/12), len(np.unique(ds.time.dt.year.values)))
+    
+    data = ds[varname].values
+    
+    # Perform regression
+    slope = []
+    intercept = []
+    rvalue = []
+    pvalue =[]
+    stderr = []
+    intercept_stderr = []
+    
+    for j in range(data.shape[-1]):
+        reg = linregress(x, data[:,j])
+        slope.append(reg.slope)
+        intercept.append(reg.intercept)
+        rvalue.append(reg.rvalue)
+        pvalue.append(reg.pvalue)
+        stderr.append(reg.stderr)
+        intercept_stderr.append(reg.intercept_stderr)
+
+    if grid_data:
+        mesh_diag = xr.open_dataset(f'{src_path}fesom.mesh.diag.nc')
+        points = np.column_stack((mesh_diag.lon.values[inds], mesh_diag.lat.values[inds]))
+        
+        # Define target regular grid
+        lon_grid = np.arange(box[0], box[1], .5)
+        lat_grid = np.arange(box[2], box[3], .5)
+        lon_mesh, lat_mesh = np.meshgrid(lon_grid, lat_grid)
+        
+        #result = {'lon': lon_grid, 'lat': lat_grid}
+        data_vars = {}
+        for data, name in zip([slope, intercept, rvalue, pvalue, stderr, intercept_stderr], 
+                ['slope', 'intercept', 'rvalue', 'pvalue', 'stderr', 'intercept_stderr']):
+        
+            # Interpolate to grid
+            data_grid = griddata(
+                points,
+                data,
+                (lon_mesh, lat_mesh),
+                method='nearest')
+            
+            #result.update({name: data_grid})
+            # Add to dataset
+            data_vars[name] = (("lat", "lon"), data_grid)
+
+            # Create the xarray dataset
+            result = xr.Dataset(
+            data_vars=data_vars,
+            coords={
+                "lon": lon_grid,
+                "lat": lat_grid,
+            }
+        )
+            
+    else:
+        # Create the dataset
+        result = xr.Dataset(
+            data_vars={
+                'lon': ('nod2', mesh_diag.lon.isel(nod2=inds).values),
+                'lat': ('nod2', mesh_diag.lat.isel(nod2=inds).values),
+                
+                'slope': ('nod2', slope),
+                'intercept': ('nod2', intercept),
+                'rvalue': ('nod2', rvalue),
+                'pvalue': ('nod2', pvalue),
+                'stderr': ('nod2', stderr),
+                'intercept_stderr': ('nod2', intercept_stderr),
+            },
+            coords={
+                'nod2': range(len(lon_grid))
+            }
+    )
+        
+    return result
+    
         
         
         
