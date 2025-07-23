@@ -202,7 +202,7 @@ def fesom_timeseries_of_mean_vertical_profile_in_region(
 
     return ds_out
         
-def regression2D_fesom(src_path, mesh_diag_path, years=(2011, 2024), box=[-180, 180, -65, -55], varname='sic', grouping='annual.mean', grid_data=True, log=True, depth=None):
+def regression2D_fesom(src_path, mesh_diag_path, years=(2011, 2024), box=[-180, 180, -65, -55], depth=None, varname='sic', grouping='annual.mean', grid_data=True, log=True):
     """
     Perform linear regression on a FESOM2 variable over time at each unstructured grid node,
     and optionally interpolate the regression results to a regular lon-lat grid.
@@ -217,6 +217,8 @@ def regression2D_fesom(src_path, mesh_diag_path, years=(2011, 2024), box=[-180, 
         Start and end year for the analysis (inclusive start, exclusive end). Default is (2011, 2024).
     box : list of float, optional
         Geographic bounding box [lon_min, lon_max, lat_min, lat_max] used to subset the mesh. Default is global Southern Ocean sector.
+    depth : float or None, optional
+        If specified, selects a vertical level (in meters) using nearest match for 3D variables.
     varname : str, optional
         Variable name in the NetCDF files to be analyzed. Default is 'sic'.
     grouping : str, optional
@@ -229,8 +231,6 @@ def regression2D_fesom(src_path, mesh_diag_path, years=(2011, 2024), box=[-180, 
         If True, interpolates regression results to a regular lon-lat grid. Default is True.
     log : bool, optional
         If True, prints progress messages. Default is True.
-    depth : float or None, optional
-        If specified, selects a vertical level (in meters) using nearest match for 3D variables.
 
     Returns
     -------
