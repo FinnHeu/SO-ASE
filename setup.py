@@ -7,7 +7,14 @@ setup(
     author="Finn Ole Heukamp",
     author_email="finn.heukamp@awi.de",
     packages=find_packages(),
-    install_requires=['numpy', 'matplotlib', 'cartopy'],
+    install_requires=[
+        'numpy',
+        'matplotlib',
+        'cartopy',
+        'xarray',
+        'pyfesom2',
+        'scipy'
+    ],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
