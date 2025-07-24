@@ -400,7 +400,7 @@ def anomaly2D_fesom(src_path, mesh_diag_path, ref_period=(2011, 2024), box=[-180
     
     files2open = [f'{src_path}{varname}.fesom.{y}.nc' for y in range(ref_period[0], ref_period[-1])]
     
-    inds = so.find_nodes_in_box(mesh_diag_path, box)
+    inds = find_nodes_in_box(mesh_diag_path, box)
 
     if log:
         print('Loading files...')
