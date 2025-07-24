@@ -93,3 +93,50 @@ def find_nodes_in_box(
         print(f"Found {len(inds)} nodes in the specified box.", flush=True)
     
     return inds
+
+def gridcell_area_hadley(ds, R=6371.0):
+    """
+    Compute and add grid cell area (km²) to an xarray.Dataset on a regular 1° lat-lon grid.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Dataset with 'lat' and 'lon' coordinates.
+    R : float, optional
+        Radius of the Earth in kilometers (default: 6371 km).
+
+    Returns
+    -------
+    ds_out : xarray.Dataset
+        New dataset with an additional variable 'cell_area'.
+    """
+    # Broadcast 2D lat-lon grids
+    lat2d, lon2d = xr.broadcast(ds.latitude, ds.longitude)
+
+    # Convert to radians
+    dlat = np.deg2rad(1.0)
+    dlon = np.deg2rad(1.0)
+    lat_rad = np.deg2rad(lat2d)
+
+    # Compute latitude bounds
+    lat1 = lat_rad - dlat / 2
+    lat2 = lat_rad + dlat / 2
+
+    # Area formula for a spherical Earth
+    area = (R ** 2) * dlon * (np.sin(lat2) - np.sin(lat1))
+    area = np.abs(area) * 1e6
+
+    # Create DataArray for area
+    area_da = xr.DataArray(
+        area,
+        coords=lat2d.coords,
+        dims=lat2d.dims,
+        name="cell_area",
+        attrs={"units": "m^2", "description": "Grid cell area assuming spherical Earth"}
+    )
+
+    # Add to dataset
+    ds_out = ds.copy()
+    ds_out["cell_area"] = area_da
+
+    return ds_out

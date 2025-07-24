@@ -2,7 +2,7 @@
 
 import xarray as xr
 import numpy as np
-from .helpers_mesh import find_nodes_in_box
+from .helpers_mesh import find_nodes_in_box, gridcell_area_hadley
 from .helpers_ice import reproject_to_latlon
 
 
@@ -287,7 +287,7 @@ def nsidc_ice_area(src_path,
 
         result.append(ice_area)
 
-    result = xr.concat(result, dim='time')
+    result = xr.concat(result, dim='time').rename('sea_ice_area')
 
     result.attrs['units'] = 'm^2'
     result.attrs['long_name'] = 'total sea ice area'
@@ -307,3 +307,78 @@ def nsidc_ice_area(src_path,
     print('Done!')
     return result
     
+def hadlsst_ice_area(src_path,
+    years=(1979, 2015),
+    box=[-180, 180, -90, -50],
+    aice_threshold=0.15,
+    grouping='annual.mean',
+    log=True):
+
+    """
+    Compute total sea ice area from HadlSST_ice data within a geographic region.
+
+    This function loads HadlSST sea ice concentration data, adds gridd cell areea, and calculates the 
+    total sea ice area where concentration exceeds a given threshold.
+
+    Parameters
+    ----------
+    src_path : str
+        Path to directory containing SIC NetCDF files named as 'sic.<year>.nc'.
+    years : tuple of int, optional
+        Start and end year (exclusive) for processing, e.g., (1979, 2015).
+    box : list of float, optional
+        Geographic bounding box [lon_min, lon_max, lat_min, lat_max] for area calculation.
+    aice_threshold : float, optional
+        Sea ice concentration threshold above which a grid cell is counted as ice-covered (default is 0.15).
+    log : bool, optional
+        If True, print progress messages during processing.
+
+    Returns
+    -------
+    xarray.DataArray
+        Time series of total sea ice area (in km²) per time step within the specified region.
+
+    Notes
+    -----
+    - Assumes a constant 25 km x 25 km grid cell size.
+    - Uses simple thresholding without accounting for partial cell coverage.
+    """
+
+    files2load = [f"{src_path}sic.{y}.nc" for y in range(years[0], years[1])]
+
+    result = []
+    for file in files2load:    
+    
+        ds = xr.open_dataset(file).load()
+        if log:
+            print(f"File loaded: {file}", flush=True)
+
+        # add gridcell area
+        ds = gridcell_area_hadley(ds, R=6371.0)
+
+        # Crop to box
+        ds = ds.sel(latitude=slice(box[3], box[2]), longitude=slice(box[0], box[1]))
+        
+        ice_area = ds.cell_area.where(ds.sic > aice_threshold, 0).sum(dim=('longitude','latitude'))
+
+        result.append(ice_area)
+
+    result = xr.concat(result, dim='time').rename('sea_ice_area')
+
+    result.attrs['units'] = 'm^2'
+    result.attrs['long_name'] = 'total sea ice area'
+    result.attrs['bounding box'] = (
+        f"Longitude: {box[0]}E to {box[1]}E, Latitude: {box[2]}N to {box[3]}N"
+    )
+
+    if grouping == 'annual.mean':
+        result = result.groupby('time.year').mean('time')
+    elif grouping == 'annual.max':
+        result = result.groupby('time.year').max('time')
+    elif grouping == 'annual.min':
+        result = result.groupby('time.year').min('time')
+    elif grouping == 'monthly.mean':
+        pass
+    
+    print('Done!')
+    return result
