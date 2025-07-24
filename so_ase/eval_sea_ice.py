@@ -20,6 +20,7 @@ def fesom_ice_area(
     years=(1979, 2015),
     box=[-180, 180, -90, -60],
     aice_threshhold=0.15,
+    grouping='annual.mean',
     log=True
 ):
     """
@@ -45,6 +46,9 @@ def fesom_ice_area(
     aice_threshhold : float, optional
         Minimum sea ice concentration (0–1) above which a node is considered ice-covered.
         Defaults to 0.15.
+    grouping : str, optional
+        Type of aggregation for the time series. Options are 'annual.mean', 'annual.max',
+        'annual.min', or 'monthly.mean'. Defaults to 'annual.mean'.
     log : bool, optional
         If True, prints progress and file loading information to standard output.
 
@@ -111,14 +115,23 @@ def fesom_ice_area(
     result = xr.concat(result, dim='time')
     print('Done!')
 
-    return result
+    if grouping == 'annual.mean':
+        result = result.groupby('time.year').mean('time')
+    elif grouping == 'annual.max':
+        result = result.groupby('time.year').max('time')
+    elif grouping == 'annual.min':
+        result = result.groupby('time.year').min('time')
+    elif grouping == 'monthly.mean':
+        pass
 
+    return result
 
 def fesom_ice_volume(
     src_path, 
     mesh_diag_path, 
     years=(1979, 2015), 
     box=[-180, 180, -90, -60], 
+    grouping='annual.mean',
     log=True
 ):
     """
@@ -205,6 +218,16 @@ def fesom_ice_volume(
         result.append(ds_cropped)
 
     result = xr.concat(result, dim='time')
+
+    if grouping == 'annual.mean':
+        result = result.groupby('time.year').mean('time')
+    elif grouping == 'annual.max':
+        result = result.groupby('time.year').max('time')
+    elif grouping == 'annual.min':
+        result = result.groupby('time.year').min('time')
+    elif grouping == 'monthly.mean':
+        pass
+
     print('Done!')
 
     return result
@@ -213,6 +236,7 @@ def nsidc_ice_area(src_path,
     years=(1979, 2015),
     box=[-180, 180, -90, -50],
     aice_threshold=0.15,
+    grouping='annual.mean',
     log=True):
 
     """
@@ -266,12 +290,28 @@ def nsidc_ice_area(src_path,
 
         mask_isice = ds.cdr_seaice_conc_monthly > aice_threshold
     
-        gridcell_area = 25 * 25 # km
+        gridcell_area = 25000 * 25000 # m^2
         ice_area = ((ds.cdr_seaice_conc_monthly * mask_geo * mask_isice) * gridcell_area).sum(dim=('x','y'))
 
         result.append(ice_area)
 
     result = xr.concat(result, dim='time')
+
+    result.attrs['units'] = 'm^2'
+    result.attrs['long_name'] = 'total sea ice area'
+    result.attrs['bounding box'] = (
+        f"Longitude: {box[0]}E to {box[1]}E, Latitude: {box[2]}N to {box[3]}N"
+    )
+
+    if grouping == 'annual.mean':
+        result = result.groupby('time.year').mean('time')
+    elif grouping == 'annual.max':
+        result = result.groupby('time.year').max('time')
+    elif grouping == 'annual.min':
+        result = result.groupby('time.year').min('time')
+    elif grouping == 'monthly.mean':
+        pass
+    
     print('Done!')
     return result
     
