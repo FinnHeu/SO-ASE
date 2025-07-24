@@ -102,7 +102,7 @@ def fesom_ice_area(
             f"Longitude: {box[0]}E to {box[1]}E, Latitude: {box[2]}N to {box[3]}N"
         )
 
-        result.append(ds_cropped)
+        result.append(ds_cropped.sea_ice_area)
 
     result = xr.concat(result, dim='time')
     print('Done!')
@@ -207,7 +207,7 @@ def fesom_ice_volume(
             f"Longitude: {box[0]}E to {box[1]}E, Latitude: {box[2]}N to {box[3]}N"
         )
 
-        result.append(ds_cropped)
+        result.append(ds_cropped.sea_ice_volume)
 
     result = xr.concat(result, dim='time')
 
