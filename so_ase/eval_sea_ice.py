@@ -11,6 +11,7 @@
 import xarray as xr
 import numpy as np
 from .helpers_mesh import find_nodes_in_box
+from .helpers_ice import reproject_to_latlon
 
 
 def fesom_ice_area(
@@ -19,7 +20,7 @@ def fesom_ice_area(
     years=(1979, 2015),
     box=[-180, 180, -90, -60],
     aice_threshhold=0.15,
-    log=True,
+    log=True
 ):
     """
     Compute total sea ice area within a specified geographic bounding box using FESOM2 output.
@@ -108,6 +109,7 @@ def fesom_ice_area(
         result.append(ds_cropped)
 
     result = xr.concat(result, dim='time')
+    print('Done!')
 
     return result
 
@@ -203,5 +205,73 @@ def fesom_ice_volume(
         result.append(ds_cropped)
 
     result = xr.concat(result, dim='time')
+    print('Done!')
 
     return result
+
+def nsidc_ice_area(src_path,
+    years=(1979, 2015),
+    box=[-180, 180, -90, -50],
+    aice_threshold=0.15,
+    log=True):
+
+    """
+    Compute total sea ice area from NSIDC CDR data within a geographic region.
+
+    This function loads NSIDC sea ice concentration data, reprojects it from 
+    polar stereographic coordinates to regular lat/lon, and calculates the 
+    total sea ice area where concentration exceeds a given threshold.
+
+    Parameters
+    ----------
+    src_path : str
+        Path to directory containing SIC NetCDF files named as 'sic.<year>.nc'.
+    years : tuple of int, optional
+        Start and end year (exclusive) for processing, e.g., (1979, 2015).
+    box : list of float, optional
+        Geographic bounding box [lon_min, lon_max, lat_min, lat_max] for area calculation.
+    aice_threshold : float, optional
+        Sea ice concentration threshold above which a grid cell is counted as ice-covered (default is 0.15).
+    log : bool, optional
+        If True, print progress messages during processing.
+
+    Returns
+    -------
+    xarray.DataArray
+        Time series of total sea ice area (in km²) per time step within the specified region.
+
+    Notes
+    -----
+    - Assumes a constant 25 km x 25 km grid cell size.
+    - Uses simple thresholding without accounting for partial cell coverage.
+    """
+
+    files2load = [f"{src_path}sic.{y}.nc" for y in range(years[0], years[1])]
+
+    result = []
+    for file in files2load:    
+    
+        ds = xr.open_dataset(file).load()
+        if log:
+            print(f"File loaded: {file}", flush=True)
+
+        # transform projection
+        ds = reproject_to_latlon(ds)
+
+        # Compute sea ice area
+        mask_geo = (
+            (ds.lat >= box[2]) & (ds.lat <= box[3]) &
+            (ds.lon >= box[0]) & (ds.lon <= box[1])
+        )
+
+        mask_isice = ds.cdr_seaice_conc_monthly > aice_threshold
+    
+        gridcell_area = 25 * 25 # km
+        ice_area = ((ds.cdr_seaice_conc_monthly * mask_geo * mask_isice) * gridcell_area).sum(dim=('x','y'))
+
+        result.append(ice_area)
+
+    result = xr.concat(result, dim='time')
+    print('Done!')
+    return result
+    
