@@ -363,6 +363,124 @@ def regression2D_fesom(src_path, mesh_diag_path, years=(2011, 2024), box=[-180, 
     )
         
     return result
+
+def anomaly2D_fesom(src_path, mesh_diag_path, ref_period=(2011, 2024), box=[-180, 180, -65, -55], depth=None, varname='a_ice', grouping='annual.mean', grid_data=True, grid_inc=.25, log=True):
+
+    """
+    Compute 2D anomalies of FESOM data over a specified reference period, with optional horizontal interpolation to a regular lat-lon grid.
+
+    Parameters
+    ----------
+    src_path : str
+        Path to the folder containing FESOM netCDF output files.
+    mesh_diag_path : str
+        Path to the mesh diagnostic file (`fesom.mesh.diag.nc`).
+    ref_period : tuple of int, optional
+        Start and end year (inclusive start, exclusive end) used to define the anomaly reference period. Default is (2011, 2024).
+    box : list of float, optional
+        Geographic bounding box [lon_min, lon_max, lat_min, lat_max] used to subset the spatial domain. Default is global Southern Ocean sector.
+    depth : float or None, optional
+        Vertical level (in meters) to extract if variable has a vertical extent (temp, salt, u, v, ...). If None, it is assumed that surface data (sst, sic, hf, ...) is used. Default is None.
+    varname : str, optional
+        Variable name to process (e.g., 'sst', 'a_ice'). Default is 'a_ice'.
+    grouping : str, optional
+        Temporal aggregation strategy, either 'annual.mean', 'annual.max', 'annual.min', or 'monthly.mean'. Only 'mean' is supported for monthly grouping (no further grouping of monthly mean output). Default is 'annual.mean'.
+    grid_data : bool, optional
+        If True, interpolate unstructured data to a regular lat-lon grid. If False, return unstructured anomalies. Default is True.
+    grid_inc : float, optional
+        Grid spacing in degrees for regular interpolation. Default is 0.25°.
+    log : bool, optional
+        If True, print progress messages to standard output. Default is True.
+
+    Returns
+    -------
+    ds_out : xarray.Dataset
+        Dataset containing the computed anomalies. If `grid_data=True`, the anomalies are on a regular (lat, lon) grid; otherwise they are on the unstructured mesh (nod2).
+    """
+    
+    files2open = [f'{src_path}{varname}.fesom.{y}.nc' for y in range(ref_period[0], ref_period[-1])]
+    
+    inds = so.find_nodes_in_box(mesh_diag_path, box)
+
+    if log:
+        print('Loading files...')
+        if depth is not None:
+            print(f'Chosen depth level: {depth}m')
+            ds = xr.open_mfdataset(files2open).isel(nod2=inds).sel(nz1=depth, method='nearest').squeeze().load()
+        else:        
+            ds = xr.open_mfdataset(files2open).isel(nod2=inds).load()
+    if log:
+        for f in files2open:
+            print(f'Files loaded: {f}')
+    
+    ds = ds.transpose('time','nod2')
+    
+    freq, how = grouping.split('.')
+    if freq == 'annual':
+        if how == 'mean':
+            ds = ds.groupby('time.year').mean()
+        elif how == 'max':
+            ds = ds.groupby('time.year').max()
+        elif how == 'min':
+            ds = ds.groupby('time.year').min()
+
+        # Remove the long-term mean from the annual means
+        ds = ds - ds.mean(dim='year') 
+        
+    elif freq == 'monthly':
+        if how != 'mean':
+            raise Warning('For monthly data no further grouping is allowed.')
+        
+        # Remove the climatology from the monthly mean data
+        ds = ds.groupby('time.month') - ds.groupby('time.month').mean()
+
+    if grid_data:
+        if log:
+            print('Gridding data...')
+            
+        mesh_diag = xr.open_dataset(f'{src_path}fesom.mesh.diag.nc')
+        points = np.column_stack((mesh_diag.lon.values[inds], mesh_diag.lat.values[inds]))
+        
+        # Define target regular grid
+        lon_grid = np.arange(box[0], box[1] + grid_inc, grid_inc)
+        lat_grid = np.arange(box[2], box[3] + grid_inc, grid_inc)
+        lon_mesh, lat_mesh = np.meshgrid(lon_grid, lat_grid)
+        
+        data_vars = {}
+        data_gridded = np.zeros((ds[varname].shape[0], len(lat_grid), len(lon_grid))) * np.nan
+        
+        #for data, name in zip(ds[varname].value, varname):
+        data = ds[varname].values
+        for i in range(ds[varname].shape[0]):
+            # Interpolate to grid
+            data_gridded[i,:,:] = griddata(
+                points,
+                data[i,:],
+                (lon_mesh, lat_mesh),
+                method='nearest')
+            
+            # Add to dataset
+            time_dim_name = list(ds[varname].dims)[0]
+            data_vars[varname] = ((time_dim_name, "lat", "lon"), data_gridded)
+
+            # Create the xarray dataset
+            ds_out = xr.Dataset(
+            data_vars=data_vars,
+            coords={
+                time_dim_name: ds[time_dim_name],
+                "lon": lon_grid,
+                "lat": lat_grid,
+            }
+        )
+
+    else:
+        ds_out = ds
+
+    if log:
+        print('Done!')
+        
+    return ds_out
+
     
         
         
