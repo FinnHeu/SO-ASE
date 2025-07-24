@@ -15,7 +15,7 @@ The `so_ase` Python module provides utilities for analyzing and visualizing Sout
 The python package can be installed using pip.
 
 cd /SO-ASE/so_ase  
-pip install .
+pip install -e .
 
 ### B) `parallelized_workflows` Subdirectory
 
