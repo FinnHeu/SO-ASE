@@ -1,13 +1,5 @@
 # so_ase.eval_sea_ice.py
 
-# To Do:
-# Sea Ice Production Maps
-#
-#
-#
-#
-#
-
 import xarray as xr
 import numpy as np
 from .helpers_mesh import find_nodes_in_box
@@ -19,7 +11,7 @@ def fesom_ice_area(
     mesh_diag_path,
     years=(1979, 2015),
     box=[-180, 180, -90, -60],
-    aice_threshhold=0.15,
+    aice_threshold=0.15,
     grouping='annual.mean',
     log=True
 ):
@@ -91,7 +83,7 @@ def fesom_ice_area(
         # Create sea ice mask
         ds_cropped["ice_mask"] = (
             ("time", "nod2"),
-            np.where(ds_cropped.a_ice > aice_threshhold, True, False),
+            np.where(ds_cropped.a_ice > aice_threshold, True, False),
         )
     
         # Sum over non-masked nodal areas
