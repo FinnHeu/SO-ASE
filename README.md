@@ -23,8 +23,10 @@ The python package can be installed using pip.
 6. python -m ipykernel install --user --name=so_ase --display-name "Python (so-ase)" (optional)
 
 The -e will install the package in editable mode, so local changes are read at import.  
-The package can now be imported from the so_ase environment in a python file and is further aailable as an ipykernel in Jupyter:     
+
+The package can now be imported from the so_ase environment in a python file.   
 import so_ase as so  
+It is further available as a kernel in Jupyter.     
 
 ### B) `parallelized_workflows` Subdirectory
 
