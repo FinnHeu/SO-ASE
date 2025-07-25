@@ -2,8 +2,7 @@
 
 import xarray as xr
 import numpy as np
-from .helpers_mesh import find_nodes_in_box, gridcell_area_hadley
-from .helpers_ice import reproject_to_latlon
+from .helpers_mesh import find_nodes_in_box, gridcell_area_hadley, reproject_to_latlon
 
 
 def fesom_ice_area(
@@ -11,7 +10,7 @@ def fesom_ice_area(
     mesh_diag_path,
     years=(1979, 2015),
     box=[-180, 180, -90, -60],
-    aice_threshold=0.15,
+    siconc_threshold=0.15,
     grouping='annual.mean',
     log=True
 ):
@@ -83,7 +82,7 @@ def fesom_ice_area(
         # Create sea ice mask
         ds_cropped["ice_mask"] = (
             ("time", "nod2"),
-            np.where(ds_cropped.a_ice > aice_threshold, True, False),
+            np.where(ds_cropped.a_ice > siconc_threshold, True, False),
         )
     
         # Sum over non-masked nodal areas
@@ -227,7 +226,7 @@ def fesom_ice_volume(
 def nsidc_ice_area(src_path,
     years=(1979, 2015),
     box=[-180, 180, -90, -50],
-    aice_threshold=0.15,
+    siconc_threshold=0.15,
     grouping='annual.mean',
     log=True):
 
@@ -246,7 +245,7 @@ def nsidc_ice_area(src_path,
         Start and end year (exclusive) for processing, e.g., (1979, 2015).
     box : list of float, optional
         Geographic bounding box [lon_min, lon_max, lat_min, lat_max] for area calculation.
-    aice_threshold : float, optional
+    siconc_threshold : float, optional
         Sea ice concentration threshold above which a grid cell is counted as ice-covered (default is 0.15).
     log : bool, optional
         If True, print progress messages during processing.
@@ -262,7 +261,7 @@ def nsidc_ice_area(src_path,
     - Uses simple thresholding without accounting for partial cell coverage.
     """
 
-    files2load = [f"{src_path}sic.{y}.nc" for y in range(years[0], years[1])]
+    files2load = [f"{src_path}siconc.{y}.nc" for y in range(years[0], years[1])]
 
     result = []
     for file in files2load:    
@@ -280,10 +279,10 @@ def nsidc_ice_area(src_path,
             (ds.lon >= box[0]) & (ds.lon <= box[1])
         )
 
-        mask_isice = ds.cdr_seaice_conc_monthly > aice_threshold
+        mask_isice = ds.siconc > siconc_threshold
     
         gridcell_area = 25000 * 25000 # m^2
-        ice_area = ((ds.cdr_seaice_conc_monthly * mask_geo * mask_isice) * gridcell_area).sum(dim=('x','y'))
+        ice_area = ((ds.siconc * mask_geo * mask_isice) * gridcell_area).sum(dim=('x','y'))
 
         result.append(ice_area)
 
@@ -310,7 +309,7 @@ def nsidc_ice_area(src_path,
 def hadlsst_ice_area(src_path,
     years=(1979, 2015),
     box=[-180, 180, -90, -50],
-    aice_threshold=0.15,
+    siconc_threshold=0.15,
     grouping='annual.mean',
     log=True):
 
@@ -328,7 +327,7 @@ def hadlsst_ice_area(src_path,
         Start and end year (exclusive) for processing, e.g., (1979, 2015).
     box : list of float, optional
         Geographic bounding box [lon_min, lon_max, lat_min, lat_max] for area calculation.
-    aice_threshold : float, optional
+    siconc_threshold : float, optional
         Sea ice concentration threshold above which a grid cell is counted as ice-covered (default is 0.15).
     log : bool, optional
         If True, print progress messages during processing.
@@ -344,7 +343,7 @@ def hadlsst_ice_area(src_path,
     - Uses simple thresholding without accounting for partial cell coverage.
     """
 
-    files2load = [f"{src_path}sic.{y}.nc" for y in range(years[0], years[1])]
+    files2load = [f"{src_path}siconc.{y}.nc" for y in range(years[0], years[1])]
 
     result = []
     for file in files2load:    
@@ -357,9 +356,9 @@ def hadlsst_ice_area(src_path,
         ds = gridcell_area_hadley(ds, R=6371.0)
 
         # Crop to box
-        ds = ds.sel(latitude=slice(box[3], box[2]), longitude=slice(box[0], box[1]))
+        ds = ds.sel(latitude=slice(box[2], box[3]), longitude=slice(box[0], box[1]))
         
-        ice_area = ds.cell_area.where(ds.sic > aice_threshold, 0).sum(dim=('longitude','latitude'))
+        ice_area = ds.cell_area.where(ds.siconc > siconc_threshold, 0).sum(dim=('longitude','latitude'))
 
         result.append(ice_area)
 
