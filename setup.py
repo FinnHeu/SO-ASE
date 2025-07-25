@@ -14,6 +14,7 @@ setup(
         'xarray',
         'pyfesom2',
         'scipy'
+        'ipykernel'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
