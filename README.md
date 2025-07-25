@@ -14,8 +14,17 @@ The `so_ase` Python module provides utilities for analyzing and visualizing Sout
 
 The python package can be installed using pip.
 
-cd /SO-ASE/so_ase  
-pip install -e .
+1. Clone the repository 
+2. cd ./SO-ASE/
+2. conda env create -f ./environment/environment.yml or conda create -f ./environment/environment.yml
+3. conda activate so_ase
+4. cd ./so_ase/
+5. pip install -e .
+6. python -m ipykernel install --user --name=so_ase --display-name "Python (so-ase)" (optional)
+
+The -e will install the package in editable mode, so local changes are read at import.  
+The package can now be imported from the so_ase environment in a python file and is further aailable as an ipykernel in Jupyter:     
+import so_ase as so  
 
 ### B) `parallelized_workflows` Subdirectory
 
