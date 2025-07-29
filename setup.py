@@ -13,7 +13,7 @@ setup(
         'cartopy',
         'xarray',
         'pyfesom2',
-        'scipy'
+        'scipy',
         'ipykernel'
     ],
     classifiers=[

@@ -16,9 +16,8 @@ The python package can be installed using pip.
 
 1. Clone the repository 
 2. cd ./SO-ASE/
-2. conda env create -f ./environment/environment.yml or conda create -f ./environment/environment.yml
-3. conda activate so_ase
-4. cd ./so_ase/
+3. conda env create -f ./environment/environment.yml or conda create -f ./environment/environment.yml
+4. conda activate so_ase
 5. pip install -e .
 6. python -m ipykernel install --user --name=so_ase --display-name "Python (so-ase)" (optional)
 
