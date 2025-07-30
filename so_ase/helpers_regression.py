@@ -288,6 +288,25 @@ def regression2D_hadlsst(src_path, years=(2011, 2024), box=[-180, 180, -65, -55]
         print('Done!')
     return result
 
+def _nanlinregress(x, y):
+    '''Calls scipy linregress only on finite numbers of x and y'''
+    finite = np.isfinite(x) & np.isfinite(y)
+    if not finite.any():
+        # empty arrays passed to linreg raise ValueError:
+        # force returning an object with nans:
+        return linregress([np.nan], [np.nan])
+    return linregress(x[finite], y[finite])
+    
+def xrlinregress(first_samples, second_samples, dim):
+    slope, intercept, r_value, p_value, std_err = xr.apply_ufunc(_nanlinregress,
+                       first_samples, second_samples,
+                       input_core_dims  = [[dim], [dim]], 
+                       output_core_dims = [[],[],[],[],[]],
+                       vectorize=True)
+        
+    return slope, intercept, r_value, p_value, std_err
+
+
 def regression2D_nsidc(src_path, years=(2011, 2024), box=[-180, 180, -65, -55], depth=None, varname='siconc', grouping='annual.mean', log=True):
     """
     Perform 2D linear regression on NSIDC SIC data over a specified region and time range.
@@ -369,42 +388,19 @@ def regression2D_nsidc(src_path, years=(2011, 2024), box=[-180, 180, -65, -55], 
         # Get time as float
         x = ds.time.dt.year.values + np.tile(np.arange(0,1,1/12), len(np.unique(ds.time.dt.year.values)))
     
-    data = ds[varname].values
-    
-    # Perform regression
-    slope = np.ones((data.shape[1], data.shape[2]))
-    intercept = np.ones_like(slope)
-    rvalue = np.ones_like(slope)
-    pvalue =np.ones_like(slope)
-    stderr = np.ones_like(slope)
-    intercept_stderr = np.ones_like(slope)
-    
-    for i in range(data.shape[1]):
-        for j in range(data.shape[2]):
-            reg = linregress(x, data[:,i,j])
-            slope[i,j] = reg.slope
-            intercept[i,j] = reg.intercept
-            rvalue[i,j] = reg.rvalue
-            pvalue[i,j] = reg.pvalue
-            stderr[i,j] = reg.stderr
-            intercept_stderr[i,j] = reg.intercept_stderr
 
-    # Create the dataset
-    result = xr.Dataset(
-    data_vars={
-        'slope': (('longitude','latitude'), slope),
-        'intercept': (('longitude','latitude'), intercept),
-        'rvalue': (('longitude','latitude'), rvalue),
-        'pvalue': (('longitude','latitude'), pvalue),
-        'stderr': (('longitude','latitude'), stderr),
-        'intercept_stderr': (('longitude','latitude'), intercept_stderr),
-    },
-    coords={
-        'longitude': ds.x,
-        'latitude': ds.y
-        }
-)
-    if log:
+    slope, intercept, r_value, p_value, std_err = xrlinregress(ds.year,ds[varname].load(),dim='year')
+   
+    slope = slope.rename('slope')
+    intercept = intercept.rename('intercept')
+    r_value = r_value.rename('rvalue')
+    p_value = p_value.rename('pvalue')
+    std_err = std_err.rename('stderr')
+    
+    result = xr.merge([slope, intercept, r_value, p_value, std_err])
+
+    
+      if log:
         print('Done!')
     return result
 

@@ -258,7 +258,7 @@ def nsidc_ice_area(src_path,
     Notes
     -----
     - Assumes a constant 25 km x 25 km grid cell size.
-    - Uses simple thresholding without accounting for partial cell coverage.
+
     """
 
     files2load = [f"{src_path}siconc.{y}.nc" for y in range(years[0], years[1])]
@@ -283,6 +283,7 @@ def nsidc_ice_area(src_path,
     
         gridcell_area = 25000 * 25000 # m^2
         ice_area = ((ds.siconc * mask_geo * mask_isice) * gridcell_area).sum(dim=('x','y'))
+        ice_area = ice_area.where(ice_area>0,np.nan)
 
         result.append(ice_area)
 
@@ -339,8 +340,7 @@ def hadlsst_ice_area(src_path,
 
     Notes
     -----
-    - Assumes a constant 25 km x 25 km grid cell size.
-    - Uses simple thresholding without accounting for partial cell coverage.
+    - Compute grid cell size from lat/lon
     """
 
     files2load = [f"{src_path}siconc.{y}.nc" for y in range(years[0], years[1])]
@@ -357,8 +357,12 @@ def hadlsst_ice_area(src_path,
 
         # Crop to box
         ds = ds.sel(latitude=slice(box[2], box[3]), longitude=slice(box[0], box[1]))
-        
-        ice_area = ds.cell_area.where(ds.siconc > siconc_threshold, 0).sum(dim=('longitude','latitude'))
+
+        # commented line is ice extent, we want ice area
+        #ice_area = ds.cell_area.where(ds.siconc > siconc_threshold, 0).sum(dim=('longitude','latitude'))
+
+        mask_isice = ds.siconc > siconc_threshold
+        ice_area = (ds.siconc * mask_isice * ds.cell_area).sum(dim=('longitude','latitude'))
 
         result.append(ice_area)
 
