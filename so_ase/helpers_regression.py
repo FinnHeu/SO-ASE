@@ -400,7 +400,7 @@ def regression2D_nsidc(src_path, years=(2011, 2024), box=[-180, 180, -65, -55], 
     result = xr.merge([slope, intercept, r_value, p_value, std_err])
 
     
-      if log:
+    if log:
         print('Done!')
     return result
 
