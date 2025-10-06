@@ -120,7 +120,7 @@ def fesom_ocean_heat_transport_as_residual(
     month_indices = (
         ds_shf_cropped.time.dt.month.values - 1
     )  # values already numpy array
-    seconds_per_month = days_in_month[month_indices] * 86500
+    seconds_per_month = days_in_month[month_indices] * 86400
     ds_shf_cropped["seconds_per_month"] = (("time"), seconds_per_month)
 
     # Compute total sum of the surface heat flux over the full examination period (SHF [W/m2] * seconds_per_month [s] * nodal area [m2])
