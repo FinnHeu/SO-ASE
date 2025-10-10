@@ -105,35 +105,66 @@ for variable in variables:
     data_file = f"{base_path_model}{variable}.fesom.{year}.nc"
     ds = xr.open_dataset(data_file)
 
-    # allocate array
-    interp = (
-        np.zeros((len(lat), len(lon), nlevs, ds.dims["time"]), dtype=np.float32)
-        * np.nan
-    )
+    # allocate array for 2D and 3D variables
+    ndims = len(list(ds.dims))
+    if ndims == 2:
+        interp = (
+            np.zeros((len(lat), len(lon), ds.dims["time"]), dtype=np.float32)
+            * np.nan
+        )
 
-    for i in range(len(ds.time)):
-        print(f"Processing time step {i+1}/{len(ds.time)} for variable {variable}")
-        for j in range(nlevs):
-            print(
-                f"Processing vertical level {j+1}/{nlevs} for variable {variable} at time step {i+1}"
-            )
+    elif ndims == 3:
+        interp = (
+            np.zeros((len(lat), len(lon), nlevs, ds.dims["time"]), dtype=np.float32)
+            * np.nan
+        )
 
+    if ndims == 2:
+        for i in range(len(ds.time)):
+            print(f"Processing time step {i+1}/{len(ds.time)} for 2D variable {variable}")
+        
             # Extract the variable data for the current time step and vertical level
-            data = ds[variable].isel(time=i, nz1=j).values
+            data = ds[variable].isel(time=i).values
 
             # Interpolate to regular grid
             interp_2D = pf.fesom2regular(
-                data, mesh, lon_grid, lat_grid, how="nn", dumpfile=True
+                data, mesh, lon_grid, lat_grid, how="nn", radius_of_influence=50000, dumpfile=True
             )
 
             # Add vertical level and time dimension
-            interp[:, :, j, i] = interp_2D[:, :]
+            interp[:, :, i] = interp_2D[:, :]
+        
+            # Create a new xarray Dataset for the interpolated data)
+        interp_ds = xr.Dataset(
+        {variable: (["lat", "lon", "time"], interp)},
+        coords={"lon": lon, "lat": lat, "time": ds.time},
+        )
 
-    # Create a new xarray Dataset for the interpolated data)
-    interp_ds = xr.Dataset(
-        {variable: (["lat", "lon", "nz1", "time"], interp)},
-        coords={"lon": lon, "lat": lat, "nz1": mesh_diag.nz1, "time": ds.time},
-    )
+
+    elif ndims == 3:
+        for i in range(len(ds.time)):
+            print(f"Processing time step {i+1}/{len(ds.time)} for 3D variable {variable}")
+            for j in range(nlevs):
+                print(
+                    f"Processing vertical level {j+1}/{nlevs} for variable {variable} at time step {i+1}"
+                )
+
+                # Extract the variable data for the current time step and vertical level
+                data = ds[variable].isel(time=i, nz1=j).values
+
+                # Interpolate to regular grid
+                interp_2D = pf.fesom2regular(
+                    data, mesh, lon_grid, lat_grid, how="nn", radius_of_influence=50000, dumpfile=True
+                )
+
+                # Add vertical level and time dimension
+                interp[:, :, j, i] = interp_2D[:, :]
+
+        # Create a new xarray Dataset for the interpolated data)
+        interp_ds = xr.Dataset(
+            {variable: (["lat", "lon", "nz1", "time"], interp)},
+            coords={"lon": lon, "lat": lat, "nz1": mesh_diag.nz1, "time": ds.time},
+        )
 
     # Save the interpolated data
     output_file = f"{dest_path}{variable}.interp.{min_lon}E.{max_lon}E.{lon_increment}E.{min_lat}N.{min_lat}N.{lat_increment}N.fesom.{year}.nc"
