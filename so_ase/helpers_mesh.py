@@ -25,7 +25,6 @@ def read_nodes(meshpath):
             nodes.append((lon, lat))
     return nodes
 
-
 def read_elements(meshpath):
     """
     Reads element connectivity information from a `elem2d.out` file.
@@ -49,7 +48,6 @@ def read_elements(meshpath):
             elements.append((n1, n2, n3))
     return elements
 
-
 def read_aux3d(meshpath):
     """
     Reads vertical level information (e.g., depths) from an `aux3d.out` file,
@@ -72,6 +70,17 @@ def read_aux3d(meshpath):
             d = float(parts)
             depths.append(d)
     depths = depths[num_levels:]  # Skip level header values
+    return depths
+
+def read_cavity_depths(meshpath):
+    with open(f'{meshpath}nod2d.out', 'r') as f:
+        num_nodes = int(f.readline())
+    with open(f'{meshpath}cavity_depth@node.out', 'r') as f:
+        depths = []
+        for _ in range(num_nodes):
+            parts = f.readline()
+            d = float(parts)
+            depths.append(d)
     return depths
 
 def find_nodes_in_box(
