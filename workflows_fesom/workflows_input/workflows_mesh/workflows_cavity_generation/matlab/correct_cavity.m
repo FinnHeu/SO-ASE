@@ -4,11 +4,11 @@ close all
 addpath(genpath('./helpers/'))
 
 % correct cavity mesh
-% finalmeshpath='/albedo/work/projects/oce_rio/cwekerle/mesh/PG01/'
-% meshpath='/albedo/work/projects/oce_rio/cwekerle/MG/mesh_jigsaw_petermann/'
+meshpath='/albedo/home/fheukamp/mesh/fmesh/mesh_jigsaw_test/mesh_RTopo2.0.4_30sec_SOCAV_v4/05_final/'
+finalmeshpath='/albedo/home/fheukamp/mesh/fmesh/mesh_jigsaw_test/mesh_RTopo2.0.4_30sec_SOCAV_v4/05_final/corrected/'
 
-finalmeshpath='/albedo/work/projects/oce_rio/cwekerle/mesh/so_ralph_new/'
-meshpath='/albedo/work/projects/oce_rio/cwekerle/mesh/so_ralph/'
+% Plotting:
+plotting=0;
 
 % Minimum number of layers:
 minlayers=3;    
@@ -33,8 +33,9 @@ A=load([meshpath,'aux3d.out']);
 numlevels=A(1);
 Levels=A(2:numlevels+1);
 
-cavity_depth=load([meshpath,'cavity_depth@node.out']);
 depth=load([meshpath,'depth.out']);
+
+cavity_depth=load([meshpath,'cavity_depth@node.out']);
 cavity_flag=cavity_depth;
 cavity_flag(cavity_flag<0)=1;
 
@@ -49,19 +50,23 @@ yc=ysur(pelem);
 
 
 
-figure
-tc=cavity_flag(pelem);
-pp=patch(xc,yc,tc);
-caxis([ 0 1])
-cb=colorbar;
-colormap jet
-set(pp,'EdgeColor','none');
-set(gca,'xlim',[-80 -50],'ylim',[75 83])
-set(gca,'xlim',[-90 -10],'ylim',[-85 -70])
-%saveas2('plots/mesh_so_ralph_cavity_flag_orig.png',200)
+if plotting
+    figure
+    tc=cavity_flag(pelem);
+    pp=patch(xc,yc,tc);
+    caxis([ 0 1])
+    cb=colorbar;
+    colormap jet
+    set(pp,'EdgeColor','none');
+    set(gca,'xlim',[-80 -50],'ylim',[75 83])
+    set(gca,'xlim',[-90 -10],'ylim',[-85 -70])
+    saveas(gcf, 'myPlot.png')
+end
 
+
+disp('Fixing mesh topology...')
 [xsur2,ysur2,elem2,nodind2,ActiveNodes]=fix_mesh_topology(xsur,ysur,elem',logical(nodind));
-n2d2=length(xsur2)
+n2d2=length(xsur2);
 el2d2=size(elem2,1);
 index2=index(ActiveNodes);
 depth2=depth(ActiveNodes);
@@ -92,13 +97,7 @@ yc=ysur(pelem);
 
 elem=elem';
 
-
-
-% load('mesh_intermediate.mat')
-% cavity_depth=cavity_depth_final;
-% cavity_flag=cavity_depth;
-% cavity_flag(cavity_depth<0)=1;
-
+disp('Correct active layers...')
 FirstActiveLayer=zeros(n2d,1);
 LastActiveLayer=zeros(n2d,1);
 % Loop through nodes:
@@ -164,8 +163,8 @@ numvertices2d_truncated=n2d;
 numvertices2d=n2d;
 IceBase2d_truncated=IceBase2d;
 
-    % Communicate:
-disp('...deepening bed to ensure all vertex pairs have overlapping depth levels')
+% Communicate:
+disp('Deepening bed to ensure all vertex pairs have overlapping depth levels...')
 t2=tic;
 
 % Compute edge list:
@@ -214,58 +213,61 @@ if sum(HasOverlap)<length(HasOverlap)
 end
 
 
+if plotting
+        
+    figure
+    tc=depth(pelem);
+    pp=patch(xc,yc,tc);
+    caxis([ -800 0])
+    cb=colorbar;
+    colormap jet
+    set(pp,'EdgeColor','none');
+    set(gca,'xlim',[-80 -50],'ylim',[75 83])
+    set(gca,'xlim',[-90 -10],'ylim',[-85 -70])
+    saveas2('plots/mesh_so_ralph_depth_new.png',200)
 
-figure
-tc=depth(pelem);
-pp=patch(xc,yc,tc);
-caxis([ -800 0])
-cb=colorbar;
-colormap jet
-set(pp,'EdgeColor','none');
-set(gca,'xlim',[-80 -50],'ylim',[75 83])
-set(gca,'xlim',[-90 -10],'ylim',[-85 -70])
-saveas2('plots/mesh_so_ralph_depth_new.png',200)
+    figure
+    tc=depth(pelem)-Depth2d_truncated(pelem);
+    pp=patch(xc,yc,tc);
+    caxis([ -50 50])
+    cb=colorbar;
+    colormap jet
+    set(pp,'EdgeColor','none');
+    set(gca,'xlim',[-80 -50],'ylim',[75 83])
+    set(gca,'xlim',[-90 -10],'ylim',[-85 -70])
+    %saveas2('plots/mesh_so_ralph_depth_corrected_diff.png',200)
 
-figure
-tc=depth(pelem)-Depth2d_truncated(pelem);
-pp=patch(xc,yc,tc);
-caxis([ -50 50])
-cb=colorbar;
-colormap jet
-set(pp,'EdgeColor','none');
-set(gca,'xlim',[-80 -50],'ylim',[75 83])
-set(gca,'xlim',[-90 -10],'ylim',[-85 -70])
-%saveas2('plots/mesh_so_ralph_depth_corrected_diff.png',200)
-
-figure
-tc=cavity_depth(pelem);
-pp=patch(xc,yc,tc);
-caxis([ -500 0])
-cb=colorbar;
-colormap jet
-set(pp,'EdgeColor','none');
-set(gca,'xlim',[-80 -50],'ylim',[75 83])
-set(gca,'xlim',[-90 -10],'ylim',[-85 -70])
-%saveas2('plots/mesh_so_ralph_cavity_depth_new.png',200)
+    figure
+    tc=cavity_depth(pelem);
+    pp=patch(xc,yc,tc);
+    caxis([ -500 0])
+    cb=colorbar;
+    colormap jet
+    set(pp,'EdgeColor','none');
+    set(gca,'xlim',[-80 -50],'ylim',[75 83])
+    set(gca,'xlim',[-90 -10],'ylim',[-85 -70])
+    %saveas2('plots/mesh_so_ralph_cavity_depth_new.png',200)
 
 
-figure
-tc=cavity_flag(pelem);
-pp=patch(xc,yc,tc);
-caxis([ 0 1])
-cb=colorbar;
-colormap jet
-set(pp,'EdgeColor','c');
-set(gca,'xlim',[-80 -50],'ylim',[75 83])
-set(gca,'xlim',[-90 -10],'ylim',[-85 -70])
-%saveas2('plots/mesh_so_ralph_cavity_flag_new.png',200)
+    figure
+    tc=cavity_flag(pelem);
+    pp=patch(xc,yc,tc);
+    caxis([ 0 1])
+    cb=colorbar;
+    colormap jet
+    set(pp,'EdgeColor','c');
+    set(gca,'xlim',[-80 -50],'ylim',[75 83])
+    set(gca,'xlim',[-90 -10],'ylim',[-85 -70])
+    %saveas2('plots/mesh_so_ralph_cavity_flag_new.png',200)
+end
 
-return
+% return
 
 % Communicate:
-disp('...saving final truncated mesh')
+disp('Saving final truncated mesh...')
 t3=tic;
 % Write nod2d file:
+disp('Writing nod2d.out...')
 fid=fopen([finalmeshpath,'nod2d.out'],'w');
 fprintf(fid,'%9i \n',numvertices2d);
 for ii=1:numvertices2d_truncated
@@ -275,13 +277,16 @@ fclose(fid);
 
 
 % Write elem2d file:
+disp('Writing elem2d.out...')
 fid=fopen([finalmeshpath,'elem2d.out'],'w');
 fprintf(fid,'%u \n',numelements2d_truncated);
 for ii=1:numelements2d_truncated
     fprintf(fid,'%u %u %u \n',Elements2d_truncated(ii,1),Elements2d_truncated(ii,2),Elements2d_truncated(ii,3));
 end
 fclose(fid);
+
 % Write aux3d file:
+disp('Writing aux3d.out...')
 fid=fopen([finalmeshpath,'aux3d.out'],'w');
 fprintf(fid,'%8f \n',length(Levels));
 for ii=1:numlevels
@@ -291,7 +296,9 @@ for ii=1:numvertices2d_truncated
     fprintf(fid,'%8f \n',Depth2d_truncated(ii));
 end
 fclose(fid);
+
 % Write cavity depth file:
+disp('Writing cavity_depth@node.out...')
 fid=fopen([finalmeshpath,'cavity_depth@node.out'],'w');
 for ii=1:numvertices2d_truncated
     fprintf(fid,'%8f \n',IceBase2d_truncated(ii));

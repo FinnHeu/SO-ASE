@@ -105,10 +105,10 @@ end
 %% Parse Optional Inputs:
 
 % Assign default values:
-cutbottlenecknodes=1;
-cutbottleneckelements=1;
-cutlakes=1;
-cutoneneighborelements=1;
+cutbottlenecknodes=0;
+cutbottleneckelements=0;
+cutlakes=0;
+cutoneneighborelements=0;
 
 % Check for additional input arguments:
 if ~isempty(varargin)
@@ -314,7 +314,7 @@ end
 %% Make the final output mesh:
 
 % Truncate the mesh
-[Elements2d,ActiveNodes2,ThisIsBoundary]=TruncateMesh(Elements2d(ActiveElements,:),ActiveNodes2);
+[Elements2d,ActiveNodes2,ThisIsBoundary]=truncate_mesh(Elements2d(ActiveElements,:),ActiveNodes2);
 % Truncate the coordinate lists:
 X2d=X2d(ActiveNodes2);
 Y2d=Y2d(ActiveNodes2);
