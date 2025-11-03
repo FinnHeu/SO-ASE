@@ -72,7 +72,7 @@ def read_aux3d(meshpath):
     depths = depths[num_levels:]  # Skip level header values
     return depths
 
-def read_cavity_depths(meshpath):
+def read_cavity_depth_at_node(meshpath):
     with open(f'{meshpath}nod2d.out', 'r') as f:
         num_nodes = int(f.readline())
     with open(f'{meshpath}cavity_depth@node.out', 'r') as f:
@@ -82,6 +82,20 @@ def read_cavity_depths(meshpath):
             d = float(parts)
             depths.append(d)
     return depths
+
+def read_element_levels(meshpath, which='seafloor'):
+    with open(f'{meshpath}elem2d.out', 'r') as f:
+        num_elem = int(f.readline())
+    if which == 'seafloor':
+        filename = 'elvls.out'
+    elif which == 'cavity':
+        filename = 'cavity_elvls.out'
+    with open(f'{meshpath}{filename}', 'r') as f:
+        elvls = []
+        for _ in range(num_elem):
+            parts = f.readline()
+            elvls.append(int(parts))
+    return np.array(elvls)
 
 def find_nodes_in_box(
         mesh_diag_path,
