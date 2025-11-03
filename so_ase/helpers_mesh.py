@@ -12,7 +12,7 @@ def read_nodes(meshpath):
         meshpath (str): Path to the directory containing `nod2d.out`.
 
     Returns:
-        list of tuple: A list of (longitude, latitude) tuples for each node.
+        array: A list of (longitude, latitude) tuples for each node.
     """
     with open(f'{meshpath}nod2d.out', 'r') as f:
         num_nodes = int(f.readline())
@@ -23,7 +23,7 @@ def read_nodes(meshpath):
             lon = float(parts[1])
             lat = float(parts[2])
             nodes.append((lon, lat))
-    return nodes
+    return np.array(nodes)
 
 def read_elements(meshpath):
     """
@@ -33,7 +33,7 @@ def read_elements(meshpath):
         meshpath (str): Path to the directory containing `elem2d.out`.
 
     Returns:
-        list of tuple: A list of elements, where each element is a tuple
+        array: A list of elements, where each element is a tuple
                        of 0-based node indices (n1, n2, n3).
     """
     with open(f'{meshpath}elem2d.out', 'r') as f:
@@ -46,7 +46,7 @@ def read_elements(meshpath):
             n2 = int(parts[1]) - 1
             n3 = int(parts[2]) - 1
             elements.append((n1, n2, n3))
-    return elements
+    return np.array(elements)
 
 def read_aux3d(meshpath):
     """
@@ -58,7 +58,7 @@ def read_aux3d(meshpath):
         meshpath (str): Path to the directory containing `aux3d.out` and `nod2d.out`.
 
     Returns:
-        list of float: A list of depth values, one for each node.
+        array of float: A list of depth values, one for each node.
     """
     with open(f'{meshpath}nod2d.out', 'r') as f:
         num_nodes = int(f.readline())
@@ -70,9 +70,18 @@ def read_aux3d(meshpath):
             d = float(parts)
             depths.append(d)
     depths = depths[num_levels:]  # Skip level header values
-    return depths
+    return np.array(depths)
 
 def read_cavity_depth_at_node(meshpath):
+    """
+    Reads ice base depth information from cavity_depth@node.out file,
+
+    Parameters:
+        meshpath (str): Path to the directory containing `aux3d.out` and `nod2d.out`.
+
+    Returns:
+        list of float: A list of depth values, one for each node.
+    """
     with open(f'{meshpath}nod2d.out', 'r') as f:
         num_nodes = int(f.readline())
     with open(f'{meshpath}cavity_depth@node.out', 'r') as f:
@@ -81,9 +90,19 @@ def read_cavity_depth_at_node(meshpath):
             parts = f.readline()
             d = float(parts)
             depths.append(d)
-    return depths
+    return np.array(depths)
 
 def read_element_levels(meshpath, which='seafloor'):
+    """
+    Reads vertical level information (first active/last active layer index) from elvls.out/cavity_elvls.out file,
+
+    Parameters:
+        meshpath (str): Path to the directory containing elvls/cavity_elvls.out.
+        which (str): either <seafloor> or <cavity> for last active layer or first active layer. 
+
+    Returns:
+        array: A list of level indices values, one for each element.
+    """
     with open(f'{meshpath}elem2d.out', 'r') as f:
         num_elem = int(f.readline())
     if which == 'seafloor':
