@@ -92,7 +92,7 @@ def read_cavity_depth_at_node(meshpath):
             depths.append(d)
     return np.array(depths)
 
-def read_element_levels(meshpath, which='seafloor'):
+def read_element_levels(meshpath, which='seafloor', raw=False):
     """
     Reads vertical level information (first active/last active layer index) from elvls.out/cavity_elvls.out file,
 
@@ -107,8 +107,12 @@ def read_element_levels(meshpath, which='seafloor'):
         num_elem = int(f.readline())
     if which == 'seafloor':
         filename = 'elvls.out'
+        if raw:
+            filename='elvls_raw.out'
     elif which == 'cavity':
         filename = 'cavity_elvls.out'
+        if raw:
+            filename='cavity_elvls_raw.out'
     with open(f'{meshpath}{filename}', 'r') as f:
         elvls = []
         for _ in range(num_elem):
