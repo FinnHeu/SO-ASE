@@ -30,7 +30,7 @@ def read_nodes(meshpath):
             
             nodes_lon.append(lon)
             nodes_lat.append(lat)
-            nodes_ind.append(idx)
+            nodes_idx.append(idx)
             nodes_coast.append(coast)
             
     return np.array(nodes_lon), np.array(nodes_lat), np.array(nodes_idx), np.array(nodes_coast)
