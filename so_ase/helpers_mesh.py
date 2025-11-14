@@ -26,7 +26,7 @@ def read_nodes(meshpath):
             idx = int(parts[0]) - 1
             lon = float(parts[1])
             lat = float(parts[2])
-            coast = bool(parts[3])
+            coast = int(parts[3])
             
             nodes_lon.append(lon)
             nodes_lat.append(lat)
