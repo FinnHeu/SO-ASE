@@ -16,14 +16,24 @@ def read_nodes(meshpath):
     """
     with open(f'{meshpath}nod2d.out', 'r') as f:
         num_nodes = int(f.readline())
-        nodes = []
+        nodes_lon = []
+        nodes_lat = []
+        nodes_idx = []
+        nodes_coast = []
+        
         for _ in range(num_nodes):
             parts = f.readline().split()
-            node_id = int(parts[0])  # unused
+            idx = int(parts[0]) - 1
             lon = float(parts[1])
             lat = float(parts[2])
-            nodes.append((lon, lat))
-    return np.array(nodes)
+            coast = bool(parts[3])
+            
+            nodes_lon.append(lon)
+            nodes_lat.append(lat)
+            nodes_ind.append(idx)
+            nodes_coast.append(coast)
+            
+    return np.array(nodes_lon), np.array(nodes_lat), np.array(nodes_idx), np.array(nodes_coast)
 
 def read_elements(meshpath):
     """
