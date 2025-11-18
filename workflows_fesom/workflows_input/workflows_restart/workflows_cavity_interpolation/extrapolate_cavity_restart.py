@@ -70,6 +70,7 @@ import cartopy.crs as ccrs
 import pyfesom2 as pf
 import cmocean.cm as cmo
 from scipy.spatial import cKDTree
+import os
 
 
 # =============================================================================
@@ -81,7 +82,7 @@ path_mesh_src = "/work/ab0995/a270186/model_inputs/fesom2/mesh/CORE2/"
 path_mesh_tgt = "/work/ab0995/a270186/model_inputs/fesom2/mesh/CORE2ice/"
 
 # Restart files on CORE2 mesh
-restart_year = 1868
+restart_year = 1867
 path_restart_src_oce = f"/work/ab0995/a270186/esm_tools/runtime/awicm3-develop/CORE2_TEST/restart/fesom/fesom.{restart_year}.oce.restart/"
 path_restart_src_ice = f"/work/ab0995/a270186/esm_tools/runtime/awicm3-develop/CORE2_TEST/restart/fesom/fesom.{restart_year}.ice.restart/"
 
@@ -91,11 +92,11 @@ path_restart_tgt_ice = f"/work/ab0995/a270186/esm_tools/runtime/awicm3-develop/C
 
 
 # Restart Destination
-path_dst_restarts_oce = "/scratch/a/a270186/restarts_extrapolated/oce/"
-path_dst_restarts_ice = "/scratch/a/a270186/restarts_extrapolated/ice/"
+path_dst_restarts_oce = f"/scratch/a/a270186/restarts_extrapolated/fesom.{restart_year}.oce.restart/"
+path_dst_restarts_ice = f"/scratch/a/a270186/restarts_extrapolated/fesom.{restart_year}.ice.restart/"
 
 # Plots Destination
-plot = True
+plot = False
 path_dst_plots = "./plots/"
 
 # =============================================================================
@@ -419,6 +420,11 @@ print('=========================================================================
 print('======================== EXTRAPOLATE CAVITY RESTARTS ========================')
 print('=============================================================================')
 print(' ')
+
+if not os.path.isdir(path_dst_restarts_oce):
+    os.mkdir(path_dst_restarts_oce)
+if not os.path.isdir(path_dst_restarts_ice):
+    os.mkdir(path_dst_restarts_ice)
 
 # =============================================================================
 # ============================ READ MESHES =================================
