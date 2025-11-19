@@ -3,6 +3,7 @@
 import xarray as xr
 import numpy as np
 from pyproj import Proj, Transformer
+from collections import defaultdict
 
 def read_nodes(meshpath):
     """
@@ -12,7 +13,10 @@ def read_nodes(meshpath):
         meshpath (str): Path to the directory containing `nod2d.out`.
 
     Returns:
-        array: A list of (longitude, latitude) tuples for each node.
+        node_lon (array): Array of node longitudes.
+        node_lat (array): Array of node latitudes.
+        node_idx (array): Array of node indices (0-based).
+        node_coast (array): Array indicating if a node is coastal (1) or not (0).
     """
     with open(f'{meshpath}nod2d.out', 'r') as f:
         num_nodes = int(f.readline())
@@ -129,6 +133,41 @@ def read_element_levels(meshpath, which='seafloor', raw=False):
             parts = f.readline()
             elvls.append(int(parts))
     return np.array(elvls)
+
+def build_element_neighbors(elements):
+    """
+    Builds a list of neighboring elements for each triangle in the mesh.
+    Parameters:
+        elements (array): An array of shape (ntri, 3) containing the node indices for each triangle.
+    Returns:
+        list: A list of lists, where each sublist contains the indices of neighboring triangles for the corresponding triangle.
+    """
+    ntri = elements.shape[0]
+    edge_to_tri = defaultdict(list)
+    
+    for tidx, tri in enumerate(elements):
+        a, b, c = tri
+        edges = [(a, b), (b, c), (c, a)]
+        for e1, e2 in edges:
+            edge = tuple(sorted((e1, e2)))
+            edge_to_tri[edge].append(tidx)
+    
+    ###---> Build Neighbors
+    neighbors = [[] for _ in range(ntri)]
+    for tidx, tri in enumerate(elements):
+        a, b, c = tri
+        edges = [(a, b), (b, c), (c, a)]
+    
+        for (e1, e2) in edges:
+            edge = tuple(sorted((e1, e2)))
+            attached = edge_to_tri[edge]
+    
+            # If edge is shared by two triangles
+            if len(attached) == 2:
+                neigh = attached[1] if attached[0] == tidx else attached[0]
+                neighbors[tidx].append(neigh)
+
+    return neighbors
 
 def find_nodes_in_box(
         mesh_diag_path,
