@@ -3,7 +3,8 @@
 import xarray as xr
 import numpy as np
 from pyproj import Proj, Transformer
-from collections import defaultdict
+from collections import defaultdict, deque
+
 
 def read_nodes(meshpath):
     """
@@ -182,6 +183,45 @@ def build_node_neighbors(node_idx, elements):
     neighbors = [list(s) for s in neighbors]
 
     return neighbors
+
+def build_node_k_ring_neighbors(elements, node_idx, k):
+    """
+    Builds k-ring neighboring nodes for each node in the mesh.
+    Parameters:
+        elements (array): An array of shape (ntri, 3) containing the node indices for each triangle.
+        node_idx (array): An array of node indices.
+        k (int): The ring number to compute (e.g., 1 for 1-ring neighbors).
+    Returns:
+        list: A list of sets, where each set contains the k-ring neighboring node indices for the corresponding node.
+    """
+
+    N = node_idx.size
+    neighbors_1 = [set() for _ in range(N)]
+    
+    for a, b, c in elements:
+        neighbors_1[a].update((b, c))
+        neighbors_1[b].update((a, c))
+        neighbors_1[c].update((a, b))
+    
+    N = len(neighbors_1)
+    k_ring = [set() for _ in range(N)]
+
+    for node in range(N):
+        visited = {node}            # avoid including the center node
+        queue = deque([(node, 0)])
+
+        while queue:
+            current, dist = queue.popleft()
+            if dist == k:     # stop expanding
+                continue
+
+            for nb in neighbors_1[current]:
+                if nb not in visited:
+                    visited.add(nb)
+                    k_ring[node].add(nb)   # add to result
+                    queue.append((nb, dist + 1))
+    
+    return k_ring
 
 def find_nodes_in_box(
         mesh_diag_path,
