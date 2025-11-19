@@ -169,6 +169,20 @@ def build_element_neighbors(elements):
 
     return neighbors
 
+def build_node_neighbors(node_idx, elements):
+    
+    N = node_idx.size
+    neighbors = [set() for _ in range(N)]
+    
+    for a, b, c in elements:
+        neighbors[a].update((b, c))
+        neighbors[b].update((a, c))
+        neighbors[c].update((a, b))
+
+    neighbors = [list(s) for s in neighbors]
+
+    return neighbors
+
 def find_nodes_in_box(
         mesh_diag_path,
         box=[-180, 180, -90, -60],
