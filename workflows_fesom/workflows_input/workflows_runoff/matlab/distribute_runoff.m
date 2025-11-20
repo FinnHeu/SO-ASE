@@ -15,13 +15,13 @@ clc
 
 %% ------------------------------------------------------------
 % specification:
-meshpath='/albedo/home/fheukamp/mesh/fmesh/mesh_jigsaw_test/mesh_RTopo2.0.4_30sec/';
-meshid='DARS2.0';
+meshpath='/albedo/work/user/fheukamp/PostDoc2/CORE2ice/inputs/mesh/';
+meshid='CORE2ice';
 datapath_river='/albedo/pool/FESOM/forcing/JRA55-do-v1.4.0_monthly_runoff/';
-destpath = '/albedo/work/user/fheukamp/PostDoc2/DARS2.0/input/';
+destpath = '/albedo/work/user/fheukamp/PostDoc2/CORE2ice/inputs/runoff/JRA55/';
 
 first_year=1958;
-num_year=42;
+num_year=62;
 
 extend_layer=1;   % 1: extend runoff to the specified range; 0: no extention
 distribution_radius=200;   %80   %unit: km; 400 300 100 % needs to be larger than the largest element
@@ -189,7 +189,7 @@ for year=first_year:first_year+num_year-1
     
     % one file per year
     %fid=netcdf.create([meshpath,'JRA55_runoff/', num2str(year), '.nc'],'NC_CLOBBER');
-    fid=netcdf.create([destpath,'forcing_data_on_grid/', num2str(year), '.nc'],'NC_CLOBBER');
+    fid=netcdf.create([destpath, num2str(year), '.nc'],'NC_CLOBBER');
     
     % define variables
     daydimID = netcdf.defDim(fid,'Dimday',num_days);
