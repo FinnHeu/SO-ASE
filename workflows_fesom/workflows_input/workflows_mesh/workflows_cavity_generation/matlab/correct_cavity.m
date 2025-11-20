@@ -4,14 +4,14 @@ close all
 addpath(genpath('./helpers/'))
 
 % correct cavity mesh
-meshpath='/albedo/home/fheukamp/mesh/fmesh/mesh_jigsaw_test/mesh_RTopo2.0.4_30sec_SOCAV_v4/05_final/'
-finalmeshpath='/albedo/home/fheukamp/mesh/fmesh/mesh_jigsaw_test/mesh_RTopo2.0.4_30sec_SOCAV_v4/05_final/corrected/'
+meshpath='/albedo/home/fheukamp/mesh/fmesh/mesh_jigsaw_test/mesh_RTopo2.0.4_30sec_SOCAV_v5/04_correct_cavity/'
+finalmeshpath='/albedo/home/fheukamp/mesh/fmesh/mesh_jigsaw_test/mesh_RTopo2.0.4_30sec_SOCAV_v5/04_correct_cavity/corrected/'
 
 % Plotting:
 plotting=0;
 
 % Minimum number of layers:
-minlayers=3;    
+minlayers=4;    
 
 % Loading mesh:
 fid=fopen([meshpath,'nod2d.out'],'r');
