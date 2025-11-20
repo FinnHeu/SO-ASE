@@ -134,3 +134,57 @@ def circular_shape(ax):
 
     ax.set_boundary(circle, transform=ax.transAxes)
     return ax
+
+def plot_on_elements(ax, lon, lat, elements, data, mask, vmin='None', vmax='None', cmap="RdBu", zorder=1):
+    """
+    Plots data on a triangular mesh defined by elements.
+    
+    Parameters:
+        ax (matplotlib.axes._subplots.AxesSubplot):
+            The axes object to plot on.
+        lon (np.ndarray):
+            Array of longitudes of the mesh nodes.
+        lat (np.ndarray):
+            Array of latitudes of the mesh nodes.
+        elements (np.ndarray):
+            Array defining the triangular elements by indices of the nodes.
+        data (np.ndarray):
+            Array of data values at each node.
+        mask (np.ndarray):
+            Boolean array indicating which elements to plot.
+        vmin (float or str, optional):
+            Minimum data value for colormap scaling. If 'None', uses min of data. Defaults to 'None'.
+        vmax (float or str, optional):
+            Maximum data value for colormap scaling. If 'None', uses max of data. Defaults to 'None'.
+        cmap (str, optional):
+            Colormap to use for plotting. Defaults to "RdBu".
+        zorder (int, optional):
+            The z-order for the plot. Defaults to 1.
+    
+    Returns: 
+        matplotlib.collections.Tripcolor:
+            The tripcolor object created by the plot.
+    """
+    
+    mask_cyclic = np.ptp(lon[elements], axis=1) > 180
+    
+    mask = (mask & ~mask_cyclic)
+    
+    if vmin == 'None':
+        vmin = min(data[mask])
+    if vmax == 'None':
+        vmax = max(data[mask])
+
+    image = ax.tripcolor(
+                        lon,
+                        lat,
+                        elements[mask],
+                        data[mask],
+                        cmap=cmap,
+                        vmin=vmin,
+                        vmax=vmax,
+                        edgecolor='k',
+                        transform=ccrs.PlateCarree(),
+                        zorder=zorder)
+
+    return image
