@@ -8,3 +8,4 @@ from .eval_ocean import fesom_ocean_heat_transport_as_residual, fesom_timeseries
 from .helpers_mesh import *
 from .helpers_regression import regression2D_fesom, regression2D_nsidc, regression2D_hadlsst, anomaly2D_fesom, dataset_regression_on_time_1D
 from .helpers_plots import add_notebook_path_to_fig
+from .eval_icebergs import *
