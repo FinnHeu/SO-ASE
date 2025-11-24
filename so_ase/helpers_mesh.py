@@ -87,6 +87,25 @@ def read_aux3d(meshpath):
     depths = depths[num_levels:]  # Skip level header values
     return np.array(depths)
 
+def read_depth_zlev(meshpath):
+    """
+    Reads vertical layer depth information from depth_zlev.out file,
+    
+    Parameters:
+        meshpath (str): Path to the directory containing `depth_zlev.out`.
+    
+    Returns:
+        array of float: A list of depth values for each vertical layer.
+        int: Number of vertical layers.
+    """
+    depth = []
+    with open(f"{meshpath}depth_zlev.out", 'r') as f:
+        num_layers = int(f.readline())
+        for i in range(num_layers):
+            depth.append(float(f.readline()))
+
+    return np.array(depth), num_layers
+
 def read_cavity_depth_at_node(meshpath):
     """
     Reads ice base depth information from cavity_depth@node.out file,
@@ -107,13 +126,38 @@ def read_cavity_depth_at_node(meshpath):
             depths.append(d)
     return np.array(depths)
 
-def read_element_levels(meshpath, which='seafloor', raw=False):
+def level_idx_to_depth(meshpath, which='seafloor', raw=False):
+    """
+    Converts level indices to depth values for either seafloor or cavity levels.
+    
+    Parameters:
+        meshpath (str): Path to the directory containing mesh files.
+        which (str): either <seafloor> or <cavity> for last active layer or first active layer. 
+        raw (bool): If True, reads raw level indices. If False, reads processed level indices.
+    
+    Returns:
+        array of float: A list of depth values, one for each element.
+    """
+    if which == 'seafloor':
+        idx_layer = read_element_levels(meshpath, which='seafloor', raw=raw, python_indexing=True)
+    elif which == 'cavity':
+        idx_layer = read_element_levels(meshpath, which='cavity', raw=raw, python_indexing=True)
+    
+    depth_levels, num_layer = read_depth_zlev(meshpath)
+
+    depth = depth_levels[idx_layer]
+
+    return depth
+
+def read_element_levels(meshpath, which='seafloor', raw=False, python_indexing=False):
     """
     Reads vertical level information (first active/last active layer index) from elvls.out/cavity_elvls.out file,
 
     Parameters:
         meshpath (str): Path to the directory containing elvls/cavity_elvls.out.
         which (str): either <seafloor> or <cavity> for last active layer or first active layer. 
+        raw (bool): If True, reads raw level indices. If False, reads processed level indices.
+        python_indexing (bool): If True, converts indices to 0-based indexing.
 
     Returns:
         array: A list of level indices values, one for each element.
@@ -132,7 +176,10 @@ def read_element_levels(meshpath, which='seafloor', raw=False):
         elvls = []
         for _ in range(num_elem):
             parts = f.readline()
-            elvls.append(int(parts))
+            if python_indexing:
+                elvls.append(int(parts)-1)
+            else:
+                elvls.append(int(parts))
     return np.array(elvls)
 
 def build_element_neighbors(elements):
