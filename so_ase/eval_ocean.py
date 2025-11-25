@@ -5,7 +5,7 @@ import numpy as np
 import pyfesom2 as pf
 from scipy.stats import linregress
 from scipy.interpolate import griddata
-from .helpers_mesh import find_nodes_in_box
+from .helpers_mesh import find_nodes_in_box, add_element_volumes
 
 # To Do:
 # ocean temperature 50S-65S horizontal mean
@@ -203,9 +203,54 @@ def fesom_timeseries_of_mean_vertical_profile_in_region(
     return ds_out
     
 
-    
-        
-        
+def fesom_total_kinetic_energy(src_path, mesh_diag_path, years=(1979, 2015), mask=None, log=False):
+
+    # load mesh diagnostics
+    mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
+    mesh_diag = add_element_volumes(mesh_diag)
+
+    # ---- Build list of all input files ----
+    years_list = list(range(years[0], years[-1]))
+    files_u = [f"{src_path}u.fesom.{y}.nc" for y in years_list]
+    files_v = [f"{src_path}v.fesom.{y}.nc" for y in years_list]
+
+    # ---- Open everything lazily with Dask ----
+    ds = xr.open_mfdataset(
+        files_u + files_v,
+        combine="by_coords",   # safer than 'nested'
+        parallel=True,
+        chunks='auto',    # good for yearly files with monthly means
+    )
+
+    if log:
+        print("All files opened.", flush=True)
+
+    # ---- Compute |u|^2 from u, v ----
+    da_uv2 = ds.u**2 + ds.v**2
+
+    # ---- Multiply by constant element volumes ----
+    KE = 0.5 * mesh_diag.elem_volume * 1030 * da_uv2
+
+    # ---- Sum along vertical ----
+    KE = KE.sum(dim="nz1")
+
+    # ---- Apply element mask ----
+    if mask is not None:
+        KE = KE.isel(elem=mask).sum(dim="elem")
+    else:
+        KE = KE.sum(dim="elem")
+
+    ds_out = xr.Dataset(
+    {
+        "KE": KE
+    },
+    coords={
+        "time": KE.time
+    }
+    )
+
+    ds_out = ds_out.compute()
+    return ds_out
         
         
         
