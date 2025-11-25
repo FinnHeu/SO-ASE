@@ -5,6 +5,7 @@ import numpy as np
 from pyproj import Proj, Transformer
 from collections import defaultdict, deque
 
+###--------> 1. Read raw mesh files
 
 def read_nodes(meshpath):
     """
@@ -182,6 +183,9 @@ def read_element_levels(meshpath, which='seafloor', raw=False, python_indexing=F
                 elvls.append(int(parts))
     return np.array(elvls)
 
+
+###--------> 2. Build neighbors of nodes and elements
+
 def build_element_neighbors(elements):
     """
     Builds a list of neighboring elements for each triangle in the mesh.
@@ -217,8 +221,16 @@ def build_element_neighbors(elements):
 
     return neighbors
 
-def build_node_neighbors(node_idx, elements):
+def build_node_neighbors(elements, node_idx):
+    """
+    Builds neighboring nodes for each node in the mesh.
     
+    Parameters:
+        elements (array): An array of shape (ntri, 3) containing the node indices for each triangle.
+        node_idx (array): An array of node indices.
+    Returns:
+        list: A list of lists, where each sublist contains the neighboring node indices for the corresponding node.
+    """    
     N = node_idx.size
     neighbors = [set() for _ in range(N)]
     
@@ -270,12 +282,51 @@ def build_node_k_ring_neighbors(elements, node_idx, k):
     
     return k_ring
 
+def build_elements_of_nodes(elements, node_idx):
+    """
+    For each node in the mesh, return the list of element indices
+    (triangles) that contain that node.
+
+    Parameters:
+        elements (array): (ntri, 3) array of triangle vertex indices.
+        node_idx (array): Array of node indices (e.g. np.arange(N)).
+
+    Returns:
+        list: A list of lists. The i-th list contains the triangle indices
+              of all elements that include node i.
+    """
+    N = node_idx.size
+    ntri = elements.shape[0]
+
+    # Initialize a list of empty lists, one per node.
+    elems_of_node = [[] for _ in range(N)]
+
+    # Loop over triangles
+    for tidx in range(ntri):
+        a, b, c = elements[tidx]
+        elems_of_node[a].append(tidx)
+        elems_of_node[b].append(tidx)
+        elems_of_node[c].append(tidx)
+
+    return elems_of_node
+
+
+###--------> 3. Select particular nodes/elements or build masks
+
 def find_nodes_in_box(
         mesh_diag_path,
         box=[-180, 180, -90, -60],
         log=True
 ):
-    """ """
+    """ 
+    Finds node indices within a specified geographical box.
+    Parameters:
+        mesh_diag_path (str): Path to the directory containing `fesom.mesh.diag.nc`.
+        box (list): List of [lon_min, lon_max, lat_min, lat_max].
+        log (bool): If True, prints the number of found nodes.
+    Returns:
+        array: Array of node indices within the specified box.
+    """
     mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
     
     # Find indices of nodes within the specified box
@@ -290,6 +341,64 @@ def find_nodes_in_box(
         print(f"Found {len(inds)} nodes in the specified box.", flush=True)
     
     return inds
+
+def build_cavity_mask(meshpath, which='element'):
+    """
+    Builds a cavity mask for either elements or nodes based on cavity levels.
+    A node is considered in the cavity if all its connected elements are cavity elements.
+
+    Parameters:
+        meshpath (str): Path to the directory containing mesh files.
+        which (str): 'element' to build mask for elements, 'node' for nodes.
+
+    Returns:
+        array of bool: Cavity mask array.
+    """
+
+    if which == 'element':
+        lev_cav = read_element_levels(meshpath, which='cavity', raw=False, python_indexing=False)
+        cavity_mask = lev_cav > 1
+    elif which == 'node':
+        elements = read_elements(meshpath)
+        node_stats = read_nodes(meshpath)
+        elems_of_node = build_elements_of_nodes(elements, node_stats[2])
+
+        cavity_mask = np.zeros(len(elems_of_node), dtype='bool')
+        for i, e in enumerate(elems_of_node):
+            if all(lev_cav[e] > 1):
+                cavity_mask[i] = True
+    
+    return cavity_mask
+
+
+###--------> 4. Add mesh diagnostics to fesom.mesh.diag.nc
+
+def add_nodal_volumes(mesh_diag):
+    """
+    Adds layer thickness and nodal volume to the mesh_diag xarray.Dataset.
+    Parameters:
+        mesh_diag (xarray.Dataset): Dataset containing 'nz' and 'nod_area'.
+    Returns:
+        xarray.Dataset: Updated dataset with 'layer_thickness' and 'nod_volume'.
+    """
+    mesh_diag['layer_thickness'] = (('nz1'), np.diff(mesh_diag.nz))
+    mesh_diag['nod_volume'] = mesh_diag.nod_area.isel(nz=0) * mesh_diag.layer_thickness
+    return mesh_diag
+
+def add_element_volumes(mesh_diag):
+    """
+    Adds layer thickness and element volume to the mesh_diag xarray.Dataset.
+    Parameters:
+        mesh_diag (xarray.Dataset): Dataset containing 'nz' and 'nod_area'.
+    Returns:
+        xarray.Dataset: Updated dataset with 'layer_thickness' and 'elem_volume'.
+    """
+    mesh_diag['layer_thickness'] = (('nz1'), np.diff(mesh_diag.nz))
+    mesh_diag['elem_volume'] = mesh_diag.elem_area * mesh_diag.layer_thickness
+    return mesh_diag
+
+
+###--------> 5. Miscellaneous mesh helper functions
 
 def gridcell_area_hadley(ds, R=6371.0):
     """
