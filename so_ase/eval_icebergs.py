@@ -15,7 +15,7 @@ def read_iceberg_initial_files(icebergpath):
 
     def read_dat(filepath):
         data = []
-        with open(filepath) as f:
+        with open(filepath, 'w') as f:
             for line in f:
                 data.append(f.readline())
         return np.array(data, dtype=float)
