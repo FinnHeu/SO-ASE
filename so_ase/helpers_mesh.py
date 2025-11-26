@@ -346,6 +346,7 @@ def build_cavity_mask(meshpath, which='element'):
     """
     Builds a cavity mask for either elements or nodes based on cavity levels.
     A node is considered in the cavity if all its connected elements are cavity elements.
+    Inverting the mask gives the open ocean mask.
 
     Parameters:
         meshpath (str): Path to the directory containing mesh files.
@@ -354,9 +355,9 @@ def build_cavity_mask(meshpath, which='element'):
     Returns:
         array of bool: Cavity mask array.
     """
-
+    lev_cav = read_element_levels(meshpath, which='cavity', raw=False, python_indexing=False)
+    
     if which == 'element':
-        lev_cav = read_element_levels(meshpath, which='cavity', raw=False, python_indexing=False)
         cavity_mask = lev_cav > 1
     elif which == 'node':
         elements = read_elements(meshpath)
