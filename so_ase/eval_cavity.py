@@ -162,7 +162,7 @@ def fesom_subshelf_heatflux(src_path, mesh_diag_path, mesh_path, mask, years=(19
 
     for i, file in enumerate(files):
 
-        file2save = f"{savepath}subshelf_heatflux_{mask}.{years_list[i]}.nc"
+        file2save = f"{savepath}subshelf_melt_{mask['name']}.{years_list[i]}.nc"
         if not isfile(file2save):
             
             ds_fh = xr.open_dataset(file)
