@@ -4,10 +4,10 @@ import xarray as xr
 import numpy as np
 import glob
 from os.path import isfile
-from .helpers_mesh import build_cavity_mask
+from .helpers_mesh import build_cavity_mask, build_cavity_regional_mask
 from .helpers_misc import seconds_per_month
 
-def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, years=(1979, 2015), mask='all', log=False, savepath='./'):
+def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, mask, years=(1979, 2015), log=False, savepath='./'):
     """
     Compute and save integrated subshelf basal melt time series from FESOM 
     freshwater flux output [m3/s].
@@ -29,14 +29,16 @@ def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, years=(19
         related mesh diagnostics.
     mesh_path : str
         Path to the FESOM mesh directory (used for building the cavity mask).
+    mask : dict or array-like
+        Identifier for which ocean cavity mask to apply.  
+        If ``dict['name'] == 'all'`` is given, the mask is generated using 
+        ``build_cavity_mask(mesh_path, which='node')``.  
+        If ``dict['name'] == 'Amery'`` is given a .kml file called ``Amery.kml`` 
+        will be loaded from ``dict['kml_path']`` from which the boolean mask will be generated.
+        If an array-like mask is supplied, it is used directly for ``isel``.
     years : tuple of int, default (1979, 2015)
         Start and end years. The function processes files for all years in 
         ``range(years[0], years[-1])``. (Note: the end year is excluded.)
-    mask : str or array-like, default 'all'
-        Identifier for which ocean cavity mask to apply.  
-        If ``'all'`` is given, the mask is generated using 
-        ``build_cavity_mask(mesh_path, which='node')``.  
-        If an array-like mask is supplied, it is used directly for ``isel``.
     log : bool, default False
         If True, print a message whenever a file is saved or skipped.
     savepath : str, default './'
@@ -50,8 +52,15 @@ def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, years=(19
     mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
 
     # Build mask
-    if mask == 'all':
-        node_mask = build_cavity_mask(mesh_path, which='node')
+    if isinstance(mask, dict):
+        if mask['name'] == 'all':
+            node_mask = build_cavity_mask(mesh_path, which='node')
+        else:
+            node_mask = build_cavity_regional_mask(mesh_path, mask['kml_path'], which=mask['name'])
+    elif isinstance(mask, list) or isinstance(mask, np.array):
+        node_mask = mask
+    else:
+        raise ValueError('Mask type is not supported!')
         
     # Build list of all input files
     years_list = list(range(years[0], years[-1]))
@@ -59,7 +68,7 @@ def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, years=(19
 
     for i, file in enumerate(files):
 
-        file2save = f"{savepath}subshelf_melt_{mask}.{years_list[i]}.nc"
+        file2save = f"{savepath}subshelf_melt_{mask['name']}.{years_list[i]}.nc"
         if not isfile(file2save):
             
             ds_fw = xr.open_dataset(file)
@@ -83,7 +92,7 @@ def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, years=(19
 
     return
 
-def fesom_subshelf_heatflux(src_path, mesh_diag_path, mesh_path, years=(1979, 2015), mask='all', log=False, savepath='./'):
+def fesom_subshelf_heatflux(src_path, mesh_diag_path, mesh_path, mask, years=(1979, 2015), log=False, savepath='./'):
 
     """
     Compute and save integrated subshelf heat flux time series from FESOM 
@@ -107,14 +116,16 @@ def fesom_subshelf_heatflux(src_path, mesh_diag_path, mesh_path, years=(1979, 20
     mesh_path : str
         Path to the FESOM mesh directory. Used to construct the subshelf 
         cavity mask.
-    years : tuple of int, default (1979, 2015)
-        Start and end years. The function processes files for all years in
-        ``range(years[0], years[-1])`` (end year excluded).
-    mask : str or array-like, default 'all'
-        Mask specifying which nodes to include.  
-        If ``'all'`` is provided, a node-based cavity mask is generated using  
+    mask : dict or array-like
+        Identifier for which ocean cavity mask to apply.  
+        If ``dict['name'] == 'all'`` is given, the mask is generated using 
         ``build_cavity_mask(mesh_path, which='node')``.  
-        If an array-like mask is supplied, it is applied directly.
+        If ``dict['name'] == 'Amery'`` is given a .kml file called ``Amery.kml`` 
+        will be loaded from ``dict['kml_path']`` from which the boolean mask will be generated.
+        If an array-like mask is supplied, it is used directly for ``isel``.
+    years : tuple of int, default (1979, 2015)
+        Start and end years. The function processes files for all years in 
+        ``range(years[0], years[-1])``. (Note: the end year is excluded.)
     log : bool, default False
         If True, print status messages when saving or skipping files.
     savepath : str, default './'
@@ -135,8 +146,15 @@ def fesom_subshelf_heatflux(src_path, mesh_diag_path, mesh_path, years=(1979, 20
     mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
 
     # Build mask
-    if mask == 'all':
-        node_mask = build_cavity_mask(mesh_path, which='node')
+    if isinstance(mask, dict):
+        if mask['name'] == 'all':
+            node_mask = build_cavity_mask(mesh_path, which='node')
+        else:
+            node_mask = build_cavity_regional_mask(mesh_path, mask['kml_path'], which=mask['name'])
+    elif isinstance(mask, list) or isinstance(mask, np.array):
+        node_mask = mask
+    else:
+        raise ValueError('Mask type is not supported!')
         
     # Build list of all input files
     years_list = list(range(years[0], years[-1]))
