@@ -2,8 +2,10 @@
 
 import xarray as xr
 import numpy as np
+import shapely.geometry as sh
 from pyproj import Proj, Transformer
 from collections import defaultdict, deque
+from .helpers_misc import lon_to_360, read_kml_coords
 
 ###--------> 1. Read raw mesh files
 
@@ -370,6 +372,40 @@ def build_cavity_mask(meshpath, which='element'):
                 cavity_mask[i] = True
     
     return cavity_mask
+
+def build_cavity_regional_mask(meshpath, kml_path, which='Filchner-Ronne'):
+    """
+    Builds a regional cavity mask for nodes based on a KML-defined polygon.
+    
+    Parameters:
+        meshpath (str): Path to the directory containing mesh files.
+        kml_path (str): Path to the directory containing KML files.
+        which (str): Name of the region (used to select the KML file).
+    
+    Returns:
+        array of bool: Regional cavity mask for nodes.
+    """
+
+    node_lon, node_lat, node_idx, node_coast = read_nodes(meshpath)
+    mask_cavity_nodes = build_cavity_mask(meshpath, which='node')
+
+    kml_file = f"{kml_path}{which}.kml"        
+    coords = read_kml_coords(kml_file, close_ring=True)
+
+    if which == 'Ross':
+        node_lon = lon_to_360(node_lon)
+    #    coords = [(i+360, j) for i, j in coords if i < 0]
+        
+    polygon = sh.Polygon(coords)
+    mask_region = mask_cavity_nodes.copy()
+    for i, b in enumerate(mask_cavity_nodes):
+        if b:
+            point = sh.Point((node_lon[i], node_lat[i]))
+            if not polygon.contains(point):
+                mask_region[i] = False
+
+    return mask_region
+        
 
 
 ###--------> 4. Add mesh diagnostics to fesom.mesh.diag.nc
