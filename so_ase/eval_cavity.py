@@ -186,7 +186,7 @@ def fesom_subshelf_heatflux(src_path, mesh_diag_path, mesh_path, mask, years=(19
 
     return
     
-def freshwaterflux_to_massflux_Gty(src_path, rho_fw=1000, filename='subshelf_melt_all.*.nc', log=True):
+def freshwaterflux_to_massflux_Gty(src_path, dst_path, rho_fw=1000, log=True):
     """
     Convert monthly mean subshelf melt time series (m³/s) into annual integrated
     mass fluxes (Gt/yr).
@@ -205,49 +205,47 @@ def freshwaterflux_to_massflux_Gty(src_path, rho_fw=1000, filename='subshelf_mel
     src_path : str
         Directory containing the input files produced by
         ``fesom_subshelf_melt()``.  
-        Expected filenames match the pattern given in ``filename``.
+    dst_path : str
+        Directory for writing the output files
     rho_fw : float, default 1000
         Density of freshwater in kg/m³.  
         Used to convert freshwater volume flux (m³/s) into mass flux (kg/s).
-    filename : str, default 'subshelf_melt_all.*.nc'
-        Glob pattern indicating which NetCDF files to process.
-        Each file must contain a DataArray named ``subshelf_melt``.
     log : bool, default True
         If True, print progress messages when opening, skipping, or saving files.
     """
 
-    files2process = np.sort(glob.glob(f"{src_path}{filename}"))
+    files2process = np.sort(glob.glob(f"{src_path}*.nc"))
     
     for file in files2process:
-        if log:
-            print(f"Opening: {file}")
-            
-        ds_subshelf_melt = xr.open_dataset(file)
-        massflux_water = ds_subshelf_melt.subshelf_melt * rho_fw # m3/s * kg/m3 = kg/s 
-        massflux_ice = massflux_water.copy() # mass is conserved: ice mass melting == freshwater mass
-    
-        year = int(massflux_ice.groupby('time.year').mean().year.values)
-        seconds = seconds_per_month(year) # compute seconds of each month
-        
-        Gty = ((massflux_ice * seconds).groupby('time.year').sum() * 1e-12) # convert monthly mean kg/s to Gt/year
-    
-        ds_out = xr.Dataset(
-                {
-                    "subshelf_melt_GTY": Gty
-                },
-                coords={
-                    "year": Gty.year
-                }
-                )
-
-        file2save = src_path + filename.split('.')[0] +'_GTY' + '.' + str(year) + '.nc'
-
-        if isfile(file2save):
+        outfile = dst_path + file.split('/')[-1].split('.')[0] + '_GTY.' + file.split('/')[-1].split('.')[1] + '.nc'
+        if isfile(outfile):
             if log:
-                print(f"Skipped: {file2save}")
+                print(f"Skipping: {file}")
         else:
-            ds_out.to_netcdf(file2save)
             if log:
-                print(f"Saved: {file2save}")
+                print(f"Opening: {file}")
+            
+            ds_subshelf_melt = xr.open_dataset(file)
+            massflux_water = ds_subshelf_melt.subshelf_melt * rho_fw # m3/s * kg/m3 = kg/s 
+            massflux_ice = massflux_water.copy() # mass is conserved: ice mass melting == freshwater mass
+        
+            year = int(massflux_ice.groupby('time.year').mean().year.values)
+            seconds = seconds_per_month(year) # compute seconds of each month
+            
+            Gty = ((massflux_ice * seconds).groupby('time.year').sum() * 1e-12) # convert monthly mean kg/s to Gt/year
+        
+            ds_out = xr.Dataset(
+                    {
+                        "subshelf_melt_GTY": Gty
+                    },
+                    coords={
+                        "year": Gty.year
+                    }
+                    )
     
+    
+            ds_out.to_netcdf(outfile)
+            if log:
+                print(f"Saved: {outfile}")
+
     return 
