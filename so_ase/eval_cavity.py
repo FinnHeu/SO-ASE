@@ -249,3 +249,78 @@ def freshwaterflux_to_massflux_Gty(src_path, dst_path, rho_fw=1000, log=True):
                 print(f"Saved: {outfile}")
 
     return 
+
+def fesom_subshelf_hydrography(src_path, mesh_diag_path, mesh_path, mask, years=(1979,1980), variable='temp', log=False, savepath='./'):
+    """
+    Extract subshelf hydrography fields from FESOM output for a given node mask
+    and save the subsetted fields to new NetCDF files.
+
+    Parameters
+    ----------
+    src_path : str
+        Directory containing yearly FESOM variable files, e.g.
+        ``/data/fesom/output/``.  
+        Each file is expected to follow the format:
+        ``{variable}.fesom.{year}.nc``.
+    mesh_diag_path : str
+        Directory containing the FESOM mesh diagnostic file
+        ``fesom.mesh.diag.nc``. This file must include the field
+        ``nod_area`` used to add node area information to the output.
+    mesh_path : str
+        Directory containing the FESOM mesh files. Required by the
+        cavity mask builders.
+    mask : dict, list, or numpy.ndarray
+        Node mask used to subset the FESOM mesh:
+        - If a **dict**, it must contain at least a `'name'` key:
+            * If ``mask['name'] == 'all'``: use the full cavity mask.
+            * Otherwise: use a regional mask defined by a KML file
+              provided in ``mask['kml_path']``.
+        - If a **list** or **np.array**, it is interpreted as a boolean or
+          integer mask directly indexable along the ``nod2`` dimension.
+    years : tuple of int, optional
+        Two-element tuple defining the year range to process.
+        The function processes all years in ``range(years[0], years[1])``.
+        For example, ``years=(1979, 1980)`` processes only 1979.
+    variable : str or list of str, optional
+        One or more variable names to extract from the source files.
+    log : bool, optional
+        If True, print progress messages.
+    savepath : str, optional
+        Directory where the subsetted NetCDF files will be written.
+    """
+    # Build mask
+    if log:
+        print("Building mask...")
+    if isinstance(mask, dict):
+        if mask['name'] == 'all':
+            node_mask = build_cavity_mask(mesh_path, which='node')
+        else:
+            node_mask = build_cavity_regional_mask(mesh_path, mask['kml_path'], which=mask['name'])
+    elif isinstance(mask, list) or isinstance(mask, np.array):
+        node_mask = mask
+    else:
+        raise ValueError('Mask type is not supported!')
+
+    if log:
+        print("Loading mesh diag...")
+    mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
+    years_list = list(range(years[0], years[-1]))
+
+    if isinstance(variable, str):
+        variable = [variable]    
+    
+    for var in variable:
+        for y in years_list:
+            infile = f"{src_path}{var}.fesom.{y}.nc"
+            outfile = f"{savepath}{var}_{mask['name']}_{y}.nc"
+            if not isfile(outfile):
+                ds = xr.open_dataset(infile).load().isel(nod2=node_mask)
+                ds['nod_area'] = mesh_diag.nod_area.isel(nod2=node_mask, nz=0).squeeze()
+                ds.to_netcdf(outfile)
+                if log:
+                    print(f"Saved: {outfile}")
+            else:
+                if log:
+                    print(f"Skipped: {outfile}")
+
+    return
