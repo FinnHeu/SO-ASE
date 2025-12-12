@@ -3,6 +3,7 @@
 import xarray as xr
 import numpy as np
 import shapely.geometry as sh
+import math
 from pyproj import Proj, Transformer
 from collections import defaultdict, deque
 from .helpers_misc import lon_to_360, read_kml_coords
@@ -513,3 +514,111 @@ def reproject_to_latlon(ds, input_proj="+proj=stere +lat_0=-90 +lat_ts=-70 +lon_
     ds['lon'].attrs['units'] = 'degrees_east'
     
     return ds
+
+def mesh2vtk(meshpath, which='seafloor'):
+    """
+    Converts a FESOM2 mesh defined by `nod2d.out` and `elem2d.out` files into VTK format.
+    
+    Parameters:
+        meshpath (str): Path to the directory containing `nod2d.out` and `elem2d.out`.
+        which (str): 'seafloor' to include last active layer, 'cavity' for first active layer, 'none' for none of both.
+    
+    Returns:
+        None: Writes a VTK file named 'mesh_output.vtk' in the current directory.
+    """
+
+
+    EARTH_RADIUS_KM = 6371.0
+
+    def read_nodes_for_vtk(filename):
+        with open(filename, 'r') as f:
+            num_nodes = int(f.readline())
+            nodes = []
+            for _ in range(num_nodes):
+                parts = f.readline().split()
+                node_id = int(parts[0])
+                lon = float(parts[1])
+                lat = float(parts[2])
+                # Convert to radians
+                lon_rad = math.radians(lon)
+                lat_rad = math.radians(lat)
+                # Convert to Cartesian
+                x = EARTH_RADIUS_KM * math.cos(lat_rad) * math.cos(lon_rad)
+                y = EARTH_RADIUS_KM * math.cos(lat_rad) * math.sin(lon_rad)
+                z = EARTH_RADIUS_KM * math.sin(lat_rad)
+                nodes.append((x, y, z))
+        return nodes
+
+    def read_elements_for_vtk(filename):
+        with open(filename, 'r') as f:
+            num_elems = int(f.readline())
+            elements = []
+            for _ in range(num_elems):
+                parts = f.readline().split()
+                # Convert to 0-based indexing
+                n1 = int(parts[0]) - 1
+                n2 = int(parts[1]) - 1
+                n3 = int(parts[2]) - 1
+                elements.append((n1, n2, n3))
+        return elements
+
+    def write_vtk(filename, nodes, elements, cell_data=None):
+        num_cells = len(elements)
+
+        # --- Basic mesh output ---
+        with open(filename, 'w') as f:
+            f.write("# vtk DataFile Version 3.0\n")
+            f.write("Mesh converted from nod2d and elem2d\n")
+            f.write("ASCII\n")
+            f.write("DATASET UNSTRUCTURED_GRID\n")
+
+            # Points
+            f.write(f"POINTS {len(nodes)} float\n")
+            for x, y, z in nodes:
+                f.write(f"{x} {y} {z}\n")
+
+            # Triangles
+            size = num_cells * 4  # 3 vertices + size indicator
+            f.write(f"CELLS {num_cells} {size}\n")
+            for n1, n2, n3 in elements:
+                f.write(f"3 {n1} {n2} {n3}\n")
+
+            f.write(f"CELL_TYPES {num_cells}\n")
+            for _ in range(num_cells):
+                f.write("5\n")  # VTK_TRIANGLE = 5
+
+            # --- CELL_DATA section: optional multiple arrays ---
+            if cell_data is not None and len(cell_data) > 0:
+                f.write(f"CELL_DATA {num_cells}\n")
+
+                for name, values in cell_data.items():
+                    if len(values) != num_cells:
+                        raise ValueError(
+                            f"Cell data array '{name}' has length {len(values)}, "
+                            f"but mesh has {num_cells} cells."
+                        )
+
+                    f.write(f"SCALARS {name} float\n")
+                    f.write("LOOKUP_TABLE default\n")
+
+                    for v in values:
+                        f.write(f"{float(v)}\n")
+
+    # Main execution
+    nodes = read_nodes_for_vtk("f{meshpath}nod2d.out")
+    elements = read_elements_for_vtk("f{meshpath}elem2d.out")
+    if which == 'seafloor':
+        depth = read_element_levels(meshpath, which='seafloor', raw=False)
+        cell_data = {
+            "last active layer": depth
+            }
+    elif which == 'cavity':
+        depth = read_element_levels(meshpath, which='cavity', raw=False)
+        cell_data = {
+            "first active layer": depth
+            }
+    elif which == 'none':
+        cell_data = None
+
+    write_vtk("mesh_output_DARS2ice_seafloor.vtk", nodes, elements, cell_data)
+    return
