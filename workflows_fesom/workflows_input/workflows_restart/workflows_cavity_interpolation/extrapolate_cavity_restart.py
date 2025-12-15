@@ -78,25 +78,24 @@ import os
 # =============================================================================
 
 # Mesh directories
-path_mesh_src = "/work/ab0995/a270186/model_inputs/fesom2/mesh/CORE2/"
-path_mesh_tgt = "/work/ab0995/a270186/model_inputs/fesom2/mesh/CORE2ice/"
+path_mesh_src = "/albedo/work/user/fheukamp/PostDoc2/CORE2/inputs/mesh/"
+path_mesh_tgt = "/albedo/work/user/fheukamp/PostDoc2/CORE2ice/inputs/mesh/"
 
 # Restart files on CORE2 mesh
-restart_year = 1867
-path_restart_src_oce = f"/work/ab0995/a270186/esm_tools/runtime/awicm3-develop/CORE2_TEST/restart/fesom/fesom.{restart_year}.oce.restart/"
-path_restart_src_ice = f"/work/ab0995/a270186/esm_tools/runtime/awicm3-develop/CORE2_TEST/restart/fesom/fesom.{restart_year}.ice.restart/"
+restart_year = 1969
+path_restart_src_oce = f"/albedo/work/user/fheukamp/PostDoc2/CORE2/results/CORE2_JRA55_fullcycle_1900/fesom.{restart_year}.oce.restart/"
+path_restart_src_ice = f"/albedo/work/user/fheukamp/PostDoc2/CORE2/results/CORE2_JRA55_fullcycle_1900/fesom.{restart_year}.ice.restart/"
 
-# Restart files on DARS2cav mesh
-path_restart_tgt_oce = f"/work/ab0995/a270186/esm_tools/runtime/awicm3-develop/CORE2ice_TEST/restart/fesom/fesom.{restart_year}.oce.restart/"
-path_restart_tgt_ice = f"/work/ab0995/a270186/esm_tools/runtime/awicm3-develop/CORE2ice_TEST/restart/fesom/fesom.{restart_year}.ice.restart/"
-
+# Restart files on CORE2ice mesh (templates)
+path_restart_tgt_oce = f"/albedo/work/user/fheukamp/PostDoc2/CORE2ice/results/CORE2ice_restart_template/fesom.1958.oce.restart/"
+path_restart_tgt_ice = f"/albedo/work/user/fheukamp/PostDoc2/CORE2ice/results/CORE2ice_restart_template/fesom.1958.ice.restart/"
 
 # Restart Destination
-path_dst_restarts_oce = f"/scratch/a/a270186/restarts_extrapolated/fesom.{restart_year}.oce.restart/"
-path_dst_restarts_ice = f"/scratch/a/a270186/restarts_extrapolated/fesom.{restart_year}.ice.restart/"
+path_dst_restarts_oce = f"/albedo/work/user/fheukamp/PostDoc2/CORE2ice/inputs/restarts_branchoff/fesom.{restart_year}.oce.restart/"
+path_dst_restarts_ice = f"/albedo/work/user/fheukamp/PostDoc2/CORE2ice/inputs/restarts_branchoff/fesom.{restart_year}.ice.restart/"
 
 # Plots Destination
-plot = False
+plot = True
 path_dst_plots = "./plots/"
 
 # =============================================================================
@@ -154,7 +153,7 @@ def build_spherical_nn_mapper(lon_source, lat_source,
 
     return indices, distances
 
-def interpolate_extrapolate_2D(varname, path_restart_src, path_restart_tgt, mapper_nodes, path_out, t_step=-1, verbose=True):
+def interpolate_extrapolate_2D(varname, path_restart_src, path_restart_tgt, mapper_nodes, path_out, mask_file, mask_file_varname, t_step=-1, verbose=True):
     
     if verbose:
         print('============ interpolate_extrapolate_node2D.py ==============')
@@ -167,16 +166,17 @@ def interpolate_extrapolate_2D(varname, path_restart_src, path_restart_tgt, mapp
     # Open files
     ds_src = xr.open_dataset(f"{path_restart_src}{varname}.nc").isel(time=-1)
     ds_tgt = xr.open_dataset(f"{path_restart_tgt}{varname}.nc").isel(time=-1)
-    
+    ds_mask = xr.open_dataset(mask_file).isel(time=-1)
+
     # Extract array of source data and destination data
     data_src = ds_src[varname].values
-    data_tgt = ds_tgt[varname].values
+    data_mask = ds_mask[mask_file_varname].values
     
     # Map source data (without cavity) to destination grid (with cavity)
     data_int = data_src[mapper_nodes]
     
     # Force cavity nodes to 0
-    data_int[data_tgt == 0] = 0
+    data_int[data_mask == 0] = 0
     
     # Make a deep copy of destination restart
     ds_int = ds_tgt.copy()
@@ -461,16 +461,17 @@ if plot:
 # ======================== 2D nodal fiels (time, node) ========================
 # =============================================================================
 varnames_2D_node = ['ssh', 'ssh_rhs_old', 'hbar']
+mask_file = f"{path_restart_tgt_oce}ssh.nc"
 
 for varname in varnames_2D_node:
-    interpolate_extrapolate_2D(varname, path_restart_src_oce, path_restart_tgt_oce, mapper_nodes, path_dst_restarts_oce, t_step=-1, verbose=True)
+    interpolate_extrapolate_2D(varname, path_restart_src_oce, path_restart_tgt_oce, mapper_nodes, path_dst_restarts_oce, mask_file, mask_file_varname='ssh',t_step=-1, verbose=True)
     if plot:
         plot_interpolated_extrapolated_field(path_restart_src_oce, path_dst_restarts_oce, varname, node_lon_src, node_lat_src, node_lon_tgt, node_lat_tgt, path_dst_plots)
 
 varnames_2D_node = ['area', 'hsnow', 'hice', 'uice', 'vice']
 
 for varname in varnames_2D_node:
-    interpolate_extrapolate_2D(varname, path_restart_src_ice, path_restart_tgt_ice, mapper_nodes, path_dst_restarts_ice, t_step=-1, verbose=True)
+    interpolate_extrapolate_2D(varname, path_restart_src_ice, path_restart_tgt_ice, mapper_nodes, path_dst_restarts_ice, mask_file, mask_file_varname='ssh', t_step=-1, verbose=True)
     if plot:
         plot_interpolated_extrapolated_field(path_restart_src_ice, path_dst_restarts_ice, varname, node_lon_src, node_lat_src, node_lon_tgt, node_lat_tgt, path_dst_plots)
 
