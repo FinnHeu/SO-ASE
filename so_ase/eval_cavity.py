@@ -72,7 +72,7 @@ def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, mask, yea
         if not isfile(file2save):
             
             ds_fw = xr.open_dataset(file)
-            SSM = (ds_fw.fw * mesh_diag.nod_area.mean(dim='nz')).isel(nod2=node_mask).sum(dim='nod2')
+            SSM = (ds_fw.fw * mesh_diag.nod_area.max(dim='nz')).isel(nod2=node_mask).sum(dim='nod2')
 
             ds_out = xr.Dataset(
             {
@@ -166,7 +166,7 @@ def fesom_subshelf_heatflux(src_path, mesh_diag_path, mesh_path, mask, years=(19
         if not isfile(file2save):
             
             ds_fh = xr.open_dataset(file)
-            SSHF = (ds_fh.fh * mesh_diag.nod_area.mean(dim='nz')).isel(nod2=node_mask).sum(dim='nod2')
+            SSHF = (ds_fh.fh * mesh_diag.nod_area.max(dim='nz')).isel(nod2=node_mask).sum(dim='nod2')
 
             ds_out = xr.Dataset(
             {
