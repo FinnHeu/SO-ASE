@@ -384,7 +384,7 @@ def fesom_subshelf_hydrography(src_path, mesh_diag_path, mesh_path, mask, years=
     for var in variable:
         for y in years_list:
             infile = f"{src_path}{var}.fesom.{y}.nc"
-            outfile = f"{savepath}{var}_{mask['name']}_{y}.nc"
+            outfile = f"{savepath}{var}_{mask['name']}.{y}.nc"
             if not isfile(outfile):
                 ds = xr.open_dataset(infile).load().isel(nod2=node_mask)
                 ds['nod_area'] = ds['nod_area'] = ('nod2', mesh_diag.nod_area.max(dim='nz').isel(nod2=node_mask).values)
