@@ -5,58 +5,98 @@ import numpy as np
 from .helpers_mesh import find_nodes_in_box, gridcell_area_hadley, reproject_to_latlon
 
 
-def fesom_ice_area(
+import os
+import numpy as np
+import xarray as xr
+
+def fesom_sea_ice_area(
     src_path,
     mesh_diag_path,
-    years=(1979, 2015),
+    out_path,
+    years=(1979, 2025),
     box=[-180, 180, -90, -60],
     siconc_threshold=0.15,
     grouping='annual.mean',
     log=True
 ):
     """
-    Compute total sea ice area within a specified geographic bounding box using FESOM2 output.
+    Compute and save total sea ice area from FESOM2 output within a specified
+    geographic bounding box.
 
-    This function loads sea ice concentration (`a_ice`) from FESOM2 output files over a range
-    of years and calculates the sea ice area by summing the nodal areas where sea ice
-    concentration exceeds a given threshold, within a user-defined geographic region.
+    This function processes yearly FESOM2 sea ice concentration files
+    (`a_ice.fesom.<year>.nc`), computes the total sea ice area by summing the
+    nodal areas where sea ice concentration exceeds a given threshold, and
+    writes the result to disk as NetCDF files. One output file is written per
+    year. If an output file already exists, that year is skipped.
+
+    The sea ice area is calculated only for mesh nodes that fall within the
+    user-defined geographic bounding box. Spatial masking is based on the
+    FESOM mesh diagnostic file (`fesom.mesh.diag.nc`), which is loaded once
+    and reused for all years.
+
+    Temporal aggregation (grouping) is applied before saving and can be
+    configured to compute annual or monthly statistics.
+
+    Output filenames are self-describing and include:
+      - the processed year,
+      - the temporal grouping (with dots removed),
+      - the geographic bounding box formatted using N/S/E/W notation.
 
     Parameters
     ----------
     src_path : str
-        Path to the directory containing FESOM2 output NetCDF files named
-        `a_ice.fesom.{year}.nc`.
+        Path to the directory containing FESOM2 sea ice concentration files
+        named `a_ice.fesom.<year>.nc`.
     mesh_diag_path : str
-        Path to the directory containing the mesh diagnostic file `fesom.mesh.diag.nc`,
-        which provides nodal coordinates and areas.
+        Path to the directory containing the FESOM mesh diagnostic file
+        `fesom.mesh.diag.nc`.
+    out_path : str
+        Directory where the output NetCDF files will be written. The directory
+        is created if it does not already exist.
     years : tuple of int, optional
-        Start and end year (exclusive) for the time series. Defaults to (1979, 2015).
+        Start and end year (end year exclusive) defining the range of years
+        to process. Default is (1979, 2025).
     box : list of float, optional
-        Geographic bounding box as [lon_min, lon_max, lat_min, lat_max] to define the region
-        of interest. Defaults to `[-180, 180, -90, -60]` (entire Southern Hemisphere).
-    aice_threshhold : float, optional
-        Minimum sea ice concentration (0–1) above which a node is considered ice-covered.
-        Defaults to 0.15.
+        Geographic bounding box specified as
+        [lon_min, lon_max, lat_min, lat_max] in degrees.
+        Longitudes are expected in degrees east, latitudes in degrees north.
+        Default is [-180, 180, -90, -60].
+    siconc_threshold : float, optional
+        Minimum sea ice concentration (range 0–1) required for a node to be
+        considered ice-covered. Default is 0.15.
     grouping : str, optional
-        Type of aggregation for the time series. Options are 'annual.mean', 'annual.max',
-        'annual.min', or 'monthly.mean'. Defaults to 'annual.mean'.
+        Temporal aggregation applied to the time series before saving.
+        Supported options are:
+          - 'annual.mean'
+          - 'annual.max'
+          - 'annual.min'
+          - 'monthly.mean'
+        Default is 'annual.mean'.
     log : bool, optional
-        If True, prints progress and file loading information to standard output.
+        If True, print progress messages, including file loading, skipping,
+        and saving information. Default is True.
 
     Returns
     -------
-    xarray.Dataset
-        Dataset containing the time series variable `sea_ice_area` (in square meters)
-        representing total sea ice area within the defined region. The variables `a_ice`
-        and the intermediate `ice_mask` are removed from the returned dataset.
-
-    Notes
-    -----
-    A binary sea ice mask is created where `a_ice > aice_threshhold`. The total sea ice area
-    is computed by summing the nodal areas (`nod_area`) over the masked nodes.
+    None
+        The function does not return any objects. Results are written directly
+        to disk as NetCDF files.
     """
 
-    # Load mesh dignostic file
+    def format_lat(lat):
+        return f"{abs(lat)}{'S' if lat < 0 else 'N'}"
+
+
+    def format_lon(lon):
+        return f"{abs(lon)}{'W' if lon < 0 else 'E'}"
+    
+    
+    def format_grouping(grouping):
+        return grouping.replace(".", "")
+        
+    os.makedirs(out_path, exist_ok=True)
+
+    # Load mesh diagnostic file once
     mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
     if log:
         print("Mesh diagnostics loaded:", flush=True)
@@ -64,58 +104,78 @@ def fesom_ice_area(
 
     # Find indices of nodes within the specified box
     inds = find_nodes_in_box(mesh_diag_path, box=box, log=log)
-      
-    # Load files for sea ice concentration from src_path
-    files2load = [f"{src_path}a_ice.fesom.{y}.nc" for y in range(years[0], years[1])]
 
-    result = []
-    
-    for file in files2load:
-        ds = xr.open_dataset(file).load()
+    # Prepare filename-safe strings
+    grouping_str = format_grouping(grouping)
+    box_str = (
+        f"{format_lon(box[0])}_{format_lon(box[1])}_"
+        f"{format_lat(box[2])}_{format_lat(box[3])}"
+    )
+
+    for year in range(years[0], years[1]):
+
+        out_file = (
+            f"{out_path}/sea_ice_area_{year}_"
+            f"{grouping_str}_{box_str}.nc"
+        )
+
+        if os.path.exists(out_file):
+            if log:
+                print(f"Skipping existing file: {out_file}", flush=True)
+            continue
+
+        in_file = f"{src_path}a_ice.fesom.{year}.nc"
         if log:
-            print(f"File loaded: {file}", flush=True)
-        
+            print(f"Processing file: {in_file}", flush=True)
+
+        ds = xr.open_dataset(in_file).load()
+
         # Crop datasets
         ds_cropped = ds.isel(nod2=inds)
         mesh_diag_cropped = mesh_diag.isel(nod2=inds)
-    
+
         # Create sea ice mask
-        ds_cropped["ice_mask"] = (
-            ("time", "nod2"),
-            np.where(ds_cropped.a_ice > siconc_threshold, True, False),
+        ice_mask = ds_cropped.a_ice > siconc_threshold
+
+        # Compute sea ice area
+        sea_ice_area = (
+            ice_mask * mesh_diag_cropped.nod_area.isel(nz=0)
+        ).sum(dim="nod2")
+
+        # Apply grouping
+        if grouping == 'annual.mean':
+            sea_ice_area = sea_ice_area.groupby("time.year").mean("time")
+        elif grouping == 'annual.max':
+            sea_ice_area = sea_ice_area.groupby("time.year").max("time")
+        elif grouping == 'annual.min':
+            sea_ice_area = sea_ice_area.groupby("time.year").min("time")
+        elif grouping == 'monthly.mean':
+            sea_ice_area = sea_ice_area
+
+        # Create output dataset
+        ds_out = sea_ice_area.to_dataset(name="sea_ice_area")
+
+        # Variable metadata
+        ds_out.sea_ice_area.attrs["units"] = "m^2"
+        ds_out.sea_ice_area.attrs["long_name"] = "total sea ice area"
+        ds_out.sea_ice_area.attrs["bounding_box"] = (
+            f"Longitude: {box[0]}E to {box[1]}E, "
+            f"Latitude: {box[2]}N to {box[3]}N"
         )
-    
-        # Sum over non-masked nodal areas
-        ds_cropped["sea_ice_area"] = (
-            ("time"),
-            (ds_cropped.ice_mask * mesh_diag_cropped.nod_area.isel(nz=0))
-            .sum(dim="nod2")
-            .values,
-        )
-    
-        # Prepare output
-        ds_cropped = ds_cropped.drop_vars(["a_ice", "ice_mask"])
-        ds_cropped.sea_ice_area.attrs["units"] = "$m^2$"
-        ds_cropped.sea_ice_area.attrs["long_name"] = "total sea ice area"
-        ds_cropped.sea_ice_area.attrs["bounding box"] = (
-            f"Longitude: {box[0]}E to {box[1]}E, Latitude: {box[2]}N to {box[3]}N"
-        )
 
-        result.append(ds_cropped.sea_ice_area)
+        # Global metadata
+        ds_out.attrs["source"] = "FESOM2"
+        ds_out.attrs["grouping"] = grouping
+        ds_out.attrs["siconc_threshold"] = siconc_threshold
 
-    result = xr.concat(result, dim='time')
-    print('Done!')
+        # Save to disk
+        ds_out.to_netcdf(out_file)
 
-    if grouping == 'annual.mean':
-        result = result.groupby('time.year').mean('time')
-    elif grouping == 'annual.max':
-        result = result.groupby('time.year').max('time')
-    elif grouping == 'annual.min':
-        result = result.groupby('time.year').min('time')
-    elif grouping == 'monthly.mean':
-        pass
+        if log:
+            print(f"Saved: {out_file}", flush=True)
 
-    return result
+    if log:
+        print("All done!", flush=True)
 
 def fesom_ice_volume(
     src_path, 

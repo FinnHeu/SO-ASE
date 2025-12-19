@@ -5,7 +5,8 @@ import numpy as np
 import pyfesom2 as pf
 from scipy.stats import linregress
 from scipy.interpolate import griddata
-from .helpers_mesh import find_nodes_in_box
+from os.path import isfile
+from .helpers_mesh import find_nodes_in_box, add_element_volumes, build_cavity_mask
 
 # To Do:
 # ocean temperature 50S-65S horizontal mean
@@ -202,10 +203,72 @@ def fesom_timeseries_of_mean_vertical_profile_in_region(
 
     return ds_out
     
+def fesom_total_kinetic_energy(src_path, mesh_diag_path, meshpath, years=(1979, 2015), mask='cavity', log=False, savepath='./'):  
 
+    # load mesh diagnostics
+    mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
+    mesh_diag = add_element_volumes(mesh_diag)
+
+    # Build mask
+    if mask == 'all':
+        element_mask = np.ones_like(len(mesh_diag.elem_area))
+    elif mask == 'cavity':
+        element_mask = build_cavity_mask(meshpath, which='element')
+    elif mask == 'open_ocean':
+        mask = build_cavity_mask(meshpath, which='element')
+        element_mask = ~mask
+    else:
+        pass
+        
+    # Build list of all input files
+    years_list = list(range(years[0], years[-1]))
+    files_u = [f"{src_path}u.fesom.{y}.nc" for y in years_list]
+    files_v = [f"{src_path}v.fesom.{y}.nc" for y in years_list]
+
+    for i, (file_u, file_v) in enumerate(zip(files_u, files_v)):
+
+        file2save = f"{savepath}kinetic_energy_{mask}.{years_list[i]}.nc"
+        if not isfile(file2save):
+            
+            
+            ds_u = xr.open_dataset(file_u)
+            ds_v = xr.open_dataset(file_v)
+        
+            if log:
+                print(f"Opened:{file_u}, {file_v}", flush=True)
+        
+            # ---- Compute |u|^2 from u, v ----
+            da_uv2 = ds_u.u**2 + ds_v.v**2
+        
+            # ---- Multiply by constant element volumes ----
+            KE = 0.5 * mesh_diag.elem_volume * 1030 * da_uv2 # 1/2 * m * |u|^2
+        
+            # ---- Sum along vertical ----
+            KE = KE.sum(dim="nz1")
+        
+            # ---- Apply element mask ----
+            if mask is not None:
+                KE = KE.isel(elem=element_mask).sum(dim="elem")
+            else:
+                KE = KE.sum(dim="elem")
+        
+            ds_out = xr.Dataset(
+            {
+                "KE": KE
+            },
+            coords={
+                "time": KE.time
+            }
+            )
     
-        
-        
+            ds_out.to_netcdf(file2save)
+            if log:
+                print(f"Saved: {file2save}")
+        else:
+            if log:
+                print(f"Skipped: {file2save}")
+
+    return
         
         
         
