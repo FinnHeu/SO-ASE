@@ -2,9 +2,13 @@
 
 import xarray as xr
 import numpy as np
+import shapely.geometry as sh
+import math
 from pyproj import Proj, Transformer
 from collections import defaultdict, deque
+from .helpers_misc import lon_to_360, read_kml_coords
 
+###--------> 1. Read raw mesh files
 
 def read_nodes(meshpath):
     """
@@ -87,6 +91,25 @@ def read_aux3d(meshpath):
     depths = depths[num_levels:]  # Skip level header values
     return np.array(depths)
 
+def read_depth_zlev(meshpath):
+    """
+    Reads vertical layer depth information from depth_zlev.out file,
+    
+    Parameters:
+        meshpath (str): Path to the directory containing `depth_zlev.out`.
+    
+    Returns:
+        array of float: A list of depth values for each vertical layer.
+        int: Number of vertical layers.
+    """
+    depth = []
+    with open(f"{meshpath}depth_zlev.out", 'r') as f:
+        num_layers = int(f.readline())
+        for i in range(num_layers):
+            depth.append(float(f.readline()))
+
+    return np.array(depth), num_layers
+
 def read_cavity_depth_at_node(meshpath):
     """
     Reads ice base depth information from cavity_depth@node.out file,
@@ -107,13 +130,38 @@ def read_cavity_depth_at_node(meshpath):
             depths.append(d)
     return np.array(depths)
 
-def read_element_levels(meshpath, which='seafloor', raw=False):
+def level_idx_to_depth(meshpath, which='seafloor', raw=False):
+    """
+    Converts level indices to depth values for either seafloor or cavity levels.
+    
+    Parameters:
+        meshpath (str): Path to the directory containing mesh files.
+        which (str): either <seafloor> or <cavity> for last active layer or first active layer. 
+        raw (bool): If True, reads raw level indices. If False, reads processed level indices.
+    
+    Returns:
+        array of float: A list of depth values, one for each element.
+    """
+    if which == 'seafloor':
+        idx_layer = read_element_levels(meshpath, which='seafloor', raw=raw, python_indexing=True)
+    elif which == 'cavity':
+        idx_layer = read_element_levels(meshpath, which='cavity', raw=raw, python_indexing=True)
+    
+    depth_levels, num_layer = read_depth_zlev(meshpath)
+
+    depth = depth_levels[idx_layer]
+
+    return depth
+
+def read_element_levels(meshpath, which='seafloor', raw=False, python_indexing=False):
     """
     Reads vertical level information (first active/last active layer index) from elvls.out/cavity_elvls.out file,
 
     Parameters:
         meshpath (str): Path to the directory containing elvls/cavity_elvls.out.
         which (str): either <seafloor> or <cavity> for last active layer or first active layer. 
+        raw (bool): If True, reads raw level indices. If False, reads processed level indices.
+        python_indexing (bool): If True, converts indices to 0-based indexing.
 
     Returns:
         array: A list of level indices values, one for each element.
@@ -132,8 +180,14 @@ def read_element_levels(meshpath, which='seafloor', raw=False):
         elvls = []
         for _ in range(num_elem):
             parts = f.readline()
-            elvls.append(int(parts))
+            if python_indexing:
+                elvls.append(int(parts)-1)
+            else:
+                elvls.append(int(parts))
     return np.array(elvls)
+
+
+###--------> 2. Build neighbors of nodes and elements
 
 def build_element_neighbors(elements):
     """
@@ -170,8 +224,16 @@ def build_element_neighbors(elements):
 
     return neighbors
 
-def build_node_neighbors(node_idx, elements):
+def build_node_neighbors(elements, node_idx):
+    """
+    Builds neighboring nodes for each node in the mesh.
     
+    Parameters:
+        elements (array): An array of shape (ntri, 3) containing the node indices for each triangle.
+        node_idx (array): An array of node indices.
+    Returns:
+        list: A list of lists, where each sublist contains the neighboring node indices for the corresponding node.
+    """    
     N = node_idx.size
     neighbors = [set() for _ in range(N)]
     
@@ -223,12 +285,51 @@ def build_node_k_ring_neighbors(elements, node_idx, k):
     
     return k_ring
 
+def build_elements_of_nodes(elements, node_idx):
+    """
+    For each node in the mesh, return the list of element indices
+    (triangles) that contain that node.
+
+    Parameters:
+        elements (array): (ntri, 3) array of triangle vertex indices.
+        node_idx (array): Array of node indices (e.g. np.arange(N)).
+
+    Returns:
+        list: A list of lists. The i-th list contains the triangle indices
+              of all elements that include node i.
+    """
+    N = node_idx.size
+    ntri = elements.shape[0]
+
+    # Initialize a list of empty lists, one per node.
+    elems_of_node = [[] for _ in range(N)]
+
+    # Loop over triangles
+    for tidx in range(ntri):
+        a, b, c = elements[tidx]
+        elems_of_node[a].append(tidx)
+        elems_of_node[b].append(tidx)
+        elems_of_node[c].append(tidx)
+
+    return elems_of_node
+
+
+###--------> 3. Select particular nodes/elements or build masks
+
 def find_nodes_in_box(
         mesh_diag_path,
         box=[-180, 180, -90, -60],
         log=True
 ):
-    """ """
+    """ 
+    Finds node indices within a specified geographical box.
+    Parameters:
+        mesh_diag_path (str): Path to the directory containing `fesom.mesh.diag.nc`.
+        box (list): List of [lon_min, lon_max, lat_min, lat_max].
+        log (bool): If True, prints the number of found nodes.
+    Returns:
+        array: Array of node indices within the specified box.
+    """
     mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
     
     # Find indices of nodes within the specified box
@@ -243,6 +344,99 @@ def find_nodes_in_box(
         print(f"Found {len(inds)} nodes in the specified box.", flush=True)
     
     return inds
+
+def build_cavity_mask(meshpath, which='element'):
+    """
+    Builds a cavity mask for either elements or nodes based on cavity levels.
+    A node is considered in the cavity if all its connected elements are cavity elements.
+    Inverting the mask gives the open ocean mask.
+
+    Parameters:
+        meshpath (str): Path to the directory containing mesh files.
+        which (str): 'element' to build mask for elements, 'node' for nodes.
+
+    Returns:
+        array of bool: Cavity mask array.
+    """
+    lev_cav = read_element_levels(meshpath, which='cavity', raw=False, python_indexing=False)
+    
+    if which == 'element':
+        cavity_mask = lev_cav > 1
+    elif which == 'node':
+        elements = read_elements(meshpath)
+        node_stats = read_nodes(meshpath)
+        elems_of_node = build_elements_of_nodes(elements, node_stats[2])
+
+        cavity_mask = np.zeros(len(elems_of_node), dtype='bool')
+        for i, e in enumerate(elems_of_node):
+            if all(lev_cav[e] > 1):
+                cavity_mask[i] = True
+    
+    return cavity_mask
+
+def build_cavity_regional_mask(meshpath, kml_path, which='Filchner-Ronne'):
+    """
+    Builds a regional cavity mask for nodes based on a KML-defined polygon.
+    
+    Parameters:
+        meshpath (str): Path to the directory containing mesh files.
+        kml_path (str): Path to the directory containing KML files.
+        which (str): Name of the region (used to select the KML file).
+    
+    Returns:
+        array of bool: Regional cavity mask for nodes.
+    """
+
+    node_lon, node_lat, node_idx, node_coast = read_nodes(meshpath)
+    mask_cavity_nodes = build_cavity_mask(meshpath, which='node')
+
+    kml_file = f"{kml_path}{which}.kml"        
+    coords = read_kml_coords(kml_file, close_ring=True)
+
+    if which == 'Ross':
+        node_lon = lon_to_360(node_lon)
+    #    coords = [(i+360, j) for i, j in coords if i < 0]
+        
+    polygon = sh.Polygon(coords)
+    mask_region = mask_cavity_nodes.copy()
+    for i, b in enumerate(mask_cavity_nodes):
+        if b:
+            point = sh.Point((node_lon[i], node_lat[i]))
+            if not polygon.contains(point):
+                mask_region[i] = False
+
+    return mask_region
+        
+
+
+###--------> 4. Add mesh diagnostics to fesom.mesh.diag.nc
+
+def add_nodal_volumes(mesh_diag):
+    """
+    Adds layer thickness and nodal volume to the mesh_diag xarray.Dataset.
+    Parameters:
+        mesh_diag (xarray.Dataset): Dataset containing 'nz' and 'nod_area'.
+    Returns:
+        xarray.Dataset: Updated dataset with 'layer_thickness' and 'nod_volume'.
+    """
+    mesh_diag['layer_thickness'] = (('nz1'), np.diff(mesh_diag.nz))
+    mesh_diag['nod_volume'] = mesh_diag.nod_area.isel(nz=0) * mesh_diag.layer_thickness
+    return mesh_diag
+
+def add_element_volumes(mesh_diag):
+    """
+    Adds layer thickness and element volume to the mesh_diag xarray.Dataset.
+    Parameters:
+        mesh_diag (xarray.Dataset): Dataset containing 'nz' and 'nod_area'.
+    Returns:
+        xarray.Dataset: Updated dataset with 'layer_thickness' and 'elem_volume'.
+    """
+    mesh_diag['layer_thickness'] = (('nz1'), np.diff(mesh_diag.nz))
+    mesh_diag['elem_volume'] = mesh_diag.elem_area * mesh_diag.layer_thickness
+    return mesh_diag
+
+
+###--------> 5. Miscellaneous mesh helper functions
 
 def gridcell_area_hadley(ds, R=6371.0):
     """
@@ -320,3 +514,111 @@ def reproject_to_latlon(ds, input_proj="+proj=stere +lat_0=-90 +lat_ts=-70 +lon_
     ds['lon'].attrs['units'] = 'degrees_east'
     
     return ds
+
+def mesh2vtk(meshpath, which='seafloor'):
+    """
+    Converts a FESOM2 mesh defined by `nod2d.out` and `elem2d.out` files into VTK format.
+    
+    Parameters:
+        meshpath (str): Path to the directory containing `nod2d.out` and `elem2d.out`.
+        which (str): 'seafloor' to include last active layer, 'cavity' for first active layer, 'none' for none of both.
+    
+    Returns:
+        None: Writes a VTK file named 'mesh_output.vtk' in the current directory.
+    """
+
+
+    EARTH_RADIUS_KM = 6371.0
+
+    def read_nodes_for_vtk(filename):
+        with open(filename, 'r') as f:
+            num_nodes = int(f.readline())
+            nodes = []
+            for _ in range(num_nodes):
+                parts = f.readline().split()
+                node_id = int(parts[0])
+                lon = float(parts[1])
+                lat = float(parts[2])
+                # Convert to radians
+                lon_rad = math.radians(lon)
+                lat_rad = math.radians(lat)
+                # Convert to Cartesian
+                x = EARTH_RADIUS_KM * math.cos(lat_rad) * math.cos(lon_rad)
+                y = EARTH_RADIUS_KM * math.cos(lat_rad) * math.sin(lon_rad)
+                z = EARTH_RADIUS_KM * math.sin(lat_rad)
+                nodes.append((x, y, z))
+        return nodes
+
+    def read_elements_for_vtk(filename):
+        with open(filename, 'r') as f:
+            num_elems = int(f.readline())
+            elements = []
+            for _ in range(num_elems):
+                parts = f.readline().split()
+                # Convert to 0-based indexing
+                n1 = int(parts[0]) - 1
+                n2 = int(parts[1]) - 1
+                n3 = int(parts[2]) - 1
+                elements.append((n1, n2, n3))
+        return elements
+
+    def write_vtk(filename, nodes, elements, cell_data=None):
+        num_cells = len(elements)
+
+        # --- Basic mesh output ---
+        with open(filename, 'w') as f:
+            f.write("# vtk DataFile Version 3.0\n")
+            f.write("Mesh converted from nod2d and elem2d\n")
+            f.write("ASCII\n")
+            f.write("DATASET UNSTRUCTURED_GRID\n")
+
+            # Points
+            f.write(f"POINTS {len(nodes)} float\n")
+            for x, y, z in nodes:
+                f.write(f"{x} {y} {z}\n")
+
+            # Triangles
+            size = num_cells * 4  # 3 vertices + size indicator
+            f.write(f"CELLS {num_cells} {size}\n")
+            for n1, n2, n3 in elements:
+                f.write(f"3 {n1} {n2} {n3}\n")
+
+            f.write(f"CELL_TYPES {num_cells}\n")
+            for _ in range(num_cells):
+                f.write("5\n")  # VTK_TRIANGLE = 5
+
+            # --- CELL_DATA section: optional multiple arrays ---
+            if cell_data is not None and len(cell_data) > 0:
+                f.write(f"CELL_DATA {num_cells}\n")
+
+                for name, values in cell_data.items():
+                    if len(values) != num_cells:
+                        raise ValueError(
+                            f"Cell data array '{name}' has length {len(values)}, "
+                            f"but mesh has {num_cells} cells."
+                        )
+
+                    f.write(f"SCALARS {name} float\n")
+                    f.write("LOOKUP_TABLE default\n")
+
+                    for v in values:
+                        f.write(f"{float(v)}\n")
+
+    # Main execution
+    nodes = read_nodes_for_vtk("f{meshpath}nod2d.out")
+    elements = read_elements_for_vtk("f{meshpath}elem2d.out")
+    if which == 'seafloor':
+        depth = read_element_levels(meshpath, which='seafloor', raw=False)
+        cell_data = {
+            "last active layer": depth
+            }
+    elif which == 'cavity':
+        depth = read_element_levels(meshpath, which='cavity', raw=False)
+        cell_data = {
+            "first active layer": depth
+            }
+    elif which == 'none':
+        cell_data = None
+
+    write_vtk("mesh_output_DARS2ice_seafloor.vtk", nodes, elements, cell_data)
+    return

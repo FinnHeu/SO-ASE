@@ -27,14 +27,6 @@ The package can now be imported from the so_ase environment in a python file.
 import so_ase as so  
 It is further available as a kernel in Jupyter.     
 
-### B) `parallelized_workflows` Subdirectory
+### B) `workflows_*` Subdirectories
 
-The `parallelized_workflows` subdirectory contains scripts for efficiently processing FESOM2 model outputs. These workflows are designed to run on high-performance computing systems using SLURM. Key features include:
-
-- **Parallelized Interpolation**: Scripts for interpolating model data onto regular grids.
-
-- **Parallelized Unrotating**: Scripts for unrotating model vector quantities.
-
-### Usage
-
-Refer to the respective documentation for detailed instructions on using the `so_ase` module and the parallelized workflows.
+The `workflows+*` subdirectories contain scripts for various application, i.e. fesom input & mesh file generation and parallelized fesom output postprocessing.

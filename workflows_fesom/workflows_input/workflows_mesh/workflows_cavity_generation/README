@@ -1,5 +1,6 @@
 Workflow for generating and optimizing the cavity_depth@node.out file:
 
-1. Run ./python/cavity_generation_optimization.ipynb (Creates file and optimizes horizontal distribution of cavity nodes)
-2. Run ./matlab/correct_cavity.m (Adjusts sea floor for numerical stability)
-3. Run mesh partitioner
+1. Run ./python/GenerateCavityFiles.ipynb (Creates file and optimizes horizontal distribution of cavity nodes)
+2. Run ./python/SmoothCavityIceBase.ipynb (Smooth the ice base and the seafloor below)
+3. Run ./matlab/correct_cavity.m (Adjusts sea floor for numerical stability)
+4. Run fesom mesh partitioner
