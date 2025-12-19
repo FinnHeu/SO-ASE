@@ -1,0 +1,19 @@
+so_ase.eval_ocean
+*****************
+
+-[ Functions ]-
+
++------------+--------------------------------------------------------------------------------------------+
+| "fesom_oce | Compute the ocean heat transport (OHT) into a region of interest during a particular       |
+| an_heat_tr | period as the residual of the total surface heat flux during the period and ocean heat     |
+| ansport_as | content change between the first and last timestep of the period, using FESOM2 model       |
+| _residual" | output.                                                                                    |
+| (...)      |                                                                                            |
++------------+--------------------------------------------------------------------------------------------+
+| "fesom_tim | Compute a time series of area-weighted mean vertical profiles for a specified region from  |
+| eseries_of | FESOM2 model output.                                                                       |
+| _mean_vert |                                                                                            |
+| ical_profi |                                                                                            |
+| le_in_regi |                                                                                            |
+| on"(...)   |                                                                                            |
++------------+--------------------------------------------------------------------------------------------+
