@@ -73,7 +73,9 @@ def fesom_ocean_heat_transport_as_residual(
 
     # Load files for surface heat flux from src_path
     files2load = [f"{src_path}fh.fesom.{y}.nc" for y in range(years[0], years[1])]
-    ds_shf = xr.open_mfdataset(files2load).load()
+    # Open files with cftime decoder
+    time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+    ds_shf = xr.open_mfdataset(files2load, decode_times=time_coder).load()
     if log:
         print("Files loaded:", flush=True)
         for f in files2load:
@@ -86,7 +88,7 @@ def fesom_ocean_heat_transport_as_residual(
 
     # Load files for ocean temperature from src_path (only for the ref and eval year)
     files2load = [f"{src_path}temp.fesom.{y}.nc" for y in [years[0], years[1]]]
-    ds_temp = xr.open_mfdataset(files2load).load()
+    ds_temp = xr.open_mfdataset(files2load, decode_times=time_coder).load()
     if log:
         print("Files loaded:", flush=True)
         for f in files2load:
@@ -188,10 +190,13 @@ def fesom_timeseries_of_mean_vertical_profile_in_region(
     
     mean_profiles = []
 
+    # Open files with cftime decoder
+    time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+
     for year in range(years[0], years[-1]):
         # Load file for each single year
         file2load = f"{src_path}{varname}.fesom.{year}.nc"
-        ds = xr.open_mfdataset(file2load).isel(nod2=inds).load()
+        ds = xr.open_mfdataset(file2load, decode_times=time_coder).isel(nod2=inds).load()
         if log:
             print(f"File loaded: {file2load}", flush=True)
         
@@ -230,9 +235,11 @@ def fesom_total_kinetic_energy(src_path, mesh_diag_path, meshpath, years=(1979, 
         file2save = f"{savepath}kinetic_energy_{mask}.{years_list[i]}.nc"
         if not isfile(file2save):
             
+            # Open files with cftime decoder
+            time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
             
-            ds_u = xr.open_dataset(file_u)
-            ds_v = xr.open_dataset(file_v)
+            ds_u = xr.open_dataset(file_u, decode_times=time_coder)
+            ds_v = xr.open_dataset(file_v, decode_times=time_coder)
         
             if log:
                 print(f"Opened:{file_u}, {file_v}", flush=True)

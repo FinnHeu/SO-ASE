@@ -66,12 +66,15 @@ def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, mask, yea
     years_list = list(range(years[0], years[-1]))
     files = [f"{src_path}fw.fesom.{y}.nc" for y in years_list]
 
+    # Open files with cftime decoder
+    time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+
     for i, file in enumerate(files):
 
         file2save = f"{savepath}subshelf_melt_{mask['name']}.{years_list[i]}.nc"
         if not isfile(file2save):
             
-            ds_fw = xr.open_dataset(file)
+            ds_fw = xr.open_dataset(file, decode_times=time_coder)
             SSM = (ds_fw.fw * mesh_diag.nod_area.max(dim='nz')).isel(nod2=node_mask).sum(dim='nod2')
 
             ds_out = xr.Dataset(
@@ -160,12 +163,15 @@ def fesom_subshelf_heatflux(src_path, mesh_diag_path, mesh_path, mask, years=(19
     years_list = list(range(years[0], years[-1]))
     files = [f"{src_path}fh.fesom.{y}.nc" for y in years_list]
 
+    # Open files with cftime decoder
+    time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+
     for i, file in enumerate(files):
 
         file2save = f"{savepath}subshelf_heatflux_{mask['name']}.{years_list[i]}.nc"
         if not isfile(file2save):
             
-            ds_fh = xr.open_dataset(file)
+            ds_fh = xr.open_dataset(file, decode_times=time_coder)
             SSHF = (ds_fh.fh * mesh_diag.nod_area.max(dim='nz')).isel(nod2=node_mask).sum(dim='nod2')
 
             ds_out = xr.Dataset(
@@ -216,6 +222,9 @@ def freshwaterflux_to_massflux_Gty(src_path, dst_path, rho_fw=1000, log=True):
 
     files2process = np.sort(glob.glob(f"{src_path}*.nc"))
     
+    # Open files with cftime decoder
+    time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+    
     for file in files2process:
         outfile = dst_path + file.split('/')[-1].split('.')[0] + '_GTY.' + file.split('/')[-1].split('.')[1] + '.nc'
         if isfile(outfile):
@@ -225,7 +234,7 @@ def freshwaterflux_to_massflux_Gty(src_path, dst_path, rho_fw=1000, log=True):
             if log:
                 print(f"Opening: {file}")
             
-            ds_subshelf_melt = xr.open_dataset(file)
+            ds_subshelf_melt = xr.open_dataset(file, decode_times=time_coder)
             massflux_water = ds_subshelf_melt.subshelf_melt * rho_fw # m3/s * kg/m3 = kg/s 
             massflux_ice = massflux_water.copy() # mass is conserved: ice mass melting == freshwater mass
         
@@ -284,6 +293,9 @@ def freshwaterflux_to_massflux_Gtm(src_path, dst_path, rho_fw=1000, log=True):
 
     files2process = np.sort(glob.glob(f"{src_path}*.nc"))
     
+    # Open files with cftime decoder
+    time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+    
     for file in files2process:
         outfile = dst_path + file.split('/')[-1].split('.')[0] + '_GTM.' + file.split('/')[-1].split('.')[1] + '.nc'
         if isfile(outfile):
@@ -293,7 +305,7 @@ def freshwaterflux_to_massflux_Gtm(src_path, dst_path, rho_fw=1000, log=True):
             if log:
                 print(f"Opening: {file}")
             
-            ds_subshelf_melt = xr.open_dataset(file)
+            ds_subshelf_melt = xr.open_dataset(file, decode_times=time_coder)
             massflux_water = ds_subshelf_melt.subshelf_melt * rho_fw # m3/s * kg/m3 = kg/s 
             massflux_ice = massflux_water.copy() # mass is conserved: ice mass melting == freshwater mass
         
@@ -378,6 +390,9 @@ def fesom_subshelf_hydrography(src_path, mesh_diag_path, mesh_path, mask, years=
     mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
     years_list = list(range(years[0], years[-1]))
 
+    # Open files with cftime decoder
+    time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+
     if isinstance(variable, str):
         variable = [variable]    
     
@@ -386,7 +401,7 @@ def fesom_subshelf_hydrography(src_path, mesh_diag_path, mesh_path, mask, years=
             infile = f"{src_path}{var}.fesom.{y}.nc"
             outfile = f"{savepath}{var}_{mask['name']}.{y}.nc"
             if not isfile(outfile):
-                ds = xr.open_dataset(infile).load().isel(nod2=node_mask)
+                ds = xr.open_dataset(infile, decode_times=time_coder).load().isel(nod2=node_mask)
                 ds['nod_area'] = ds['nod_area'] = ('nod2', mesh_diag.nod_area.max(dim='nz').isel(nod2=node_mask).values)
                 ds.to_netcdf(outfile)
                 if log:
