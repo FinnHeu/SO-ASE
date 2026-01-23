@@ -86,6 +86,12 @@ def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, mask, yea
             }
             )
     
+            # Add units attribute
+            ds_out["subshelf_melt"].attrs = {
+                "units": "m3/s",
+                "description": "sum(subshelf_melt(i) [m/s] * area(i) [m2]) over cavity region"
+            }
+    
             ds_out.to_netcdf(file2save)
             if log:
                 print(f"Saved: {file2save}")
