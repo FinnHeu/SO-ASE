@@ -1,7 +1,7 @@
 """
 Interpolate FESOM2 data on nodes to a regular lat/lon mesh
 
-This script interpolates FESOM2 data on nodes to a regular latitude-longitude grid using
+This script interpolates FESOM2 data on nodes to a regular latitude-longitude grid using a modified
 `pyfesom2.fesom2regular()`. It processes all time steps and vertical levels in the input data
 for a given year and saves the interpolated output as NetCDF files.
 
@@ -48,8 +48,12 @@ import sys
 import xarray as xr
 import pyfesom2 as pf
 import numpy as np
-from os.path import isdir
+import os
+import joblib
+import scipy
+from os.path import isdir, isfile
 from os import makedirs
+from scipy.spatial import cKDTree
 
 # Get inputs from command line arguments
 # Parse fixed arguments
@@ -63,11 +67,18 @@ min_lon = float(sys.argv[6])
 max_lon = float(sys.argv[7])
 lat_increment = float(sys.argv[8])
 lon_increment = float(sys.argv[9])
+radius_of_influence = float(sys.argv[10])
 
-variables = sys.argv[10:]  # Remaining arguments are variable names
+raw_variables = sys.argv[11:]  # Remaining arguments are variable names
+variables = [
+    v.strip()
+    for part in raw_variables
+    for v in part.split(",")
+    if v.strip()
+]
 
 # Destination path for interpolated data
-dest_path = base_path_model + "interpolated/"
+dest_path = base_path_model + "/gridded/"
 
 # Logging for confirmation
 print(f"Processing year: {year}")
@@ -76,12 +87,13 @@ print(f"Base path mesh: {base_path_mesh}")
 print(f"Base path output: {dest_path}")
 print(f"Latitude bounds: {min_lat} to {max_lat} (step {lat_increment})")
 print(f"Longitude bounds: {min_lon} to {max_lon} (step {lon_increment})")
+print(f"Radius of influence: {radius_of_influence}")
 print(f"Variables to interpolate: {variables}")
 
 # Ensure the output directory exists
 if not isdir(dest_path):
     print(f"Creating output directory: {dest_path}")
-    makedirs(dest_path)
+    makedirs(dest_path, exist_ok=True)
 
 # Generate the lat/lon grid
 lat = np.arange(min_lat, max_lat + lat_increment, lat_increment)
@@ -92,18 +104,182 @@ print(f"Generated grid: {len(lat)} latitudes x {len(lon)} longitudes")
 
 # Load Mesh
 mesh = pf.load_mesh(base_path_mesh, usepickle=False)
-mesh_diag = xr.open_dataset(f"{base_path_model}fesom.mesh.diag.nc")
+mesh_diag = xr.open_dataset(f"{base_path_mesh}fesom.mesh.diag.nc")
+
+# Define time encoding
+time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
 
 # Get number of vertical levels
 nlevs = len(mesh_diag.nz1)
 
-# Interpolate
+# Define helper functions
+def lon_lat_to_cartesian(lon, lat, R=6371000):
+    """
+    calculates lon, lat coordinates of a point on a sphere with
+    radius R. Taken from http://earthpy.org/interpolation_between_grids_with_ckdtree.html
+    """
+    lon_r = np.radians(lon)
+    lat_r = np.radians(lat)
+
+    x = R * np.cos(lat_r) * np.cos(lon_r)
+    y = R * np.cos(lat_r) * np.sin(lon_r)
+    z = R * np.sin(lat_r)
+    return x, y, z
+
+def create_indexes_and_distances(mesh, lons, lats, k=1):
+    """
+    Creates KDTree object and query it for indexes of points in FESOM mesh that are close to the
+    points of the target grid. Also return distances of the original points to target points.
+
+    Parameters
+    ----------
+    mesh : fesom_mesh object
+        pyfesom mesh representation
+    lons/lats : array
+        2d arrays with target grid values.
+    k : int
+        k-th nearest neighbors to return.
+    n_jobs : int, optional
+        Number of jobs to schedule for parallel processing. If -1 is given
+        all processors are used. Default: 1.
+
+    Returns
+    -------
+    distances : array of floats
+        The distances to the nearest neighbors.
+    inds : ndarray of ints
+        The locations of the neighbors in data.
+
+    """
+    xs, ys, zs = lon_lat_to_cartesian(mesh.x2, mesh.y2)
+    xt, yt, zt = lon_lat_to_cartesian(lons.flatten(), lats.flatten())
+
+    tree = cKDTree(list(zip(xs, ys, zs)))
+
+    border_version = "1.6.0"
+    current_version = scipy.__version__
+    v1_parts = list(map(int, border_version.split(".")))
+    v2_parts = list(map(int, current_version.split(".")))
+
+    if v2_parts > v1_parts:
+        distances, inds = tree.query(list(zip(xt, yt, zt)), k=k)
+    else:
+        distances, inds = tree.query(list(zip(xt, yt, zt)), k=k)
+
+    return distances, inds
+
+def fesom2regular_nn(
+    data,
+    mesh,
+    lons,
+    lats,
+    distances_path=None,
+    inds_path=None,
+    radius_of_influence=100000,
+    dumpfile=False,
+):
+    """
+    Nearest-neighbor interpolation from FESOM mesh to target grid.
+    """
+
+    left, right = np.min(lons), np.max(lons)
+    down, up = np.min(lats), np.max(lats)
+    lonNumber, latNumber = lons.shape[1], lats.shape[0]
+
+    kk = 1  # nearest neighbor
+
+    MESH_BASE = os.path.basename(mesh.path)
+    CACHE_DIR = os.environ.get(
+        "PYFESOM_CACHE",
+        os.path.join(os.getcwd(), "MESH_cache"),
+    )
+    CACHE_DIR = os.path.join(CACHE_DIR, MESH_BASE)
+    os.makedirs(CACHE_DIR, exist_ok=True)
+
+    distances_file = (
+        f"distances_{mesh.n2d}_{left}_{right}_{down}_{up}_"
+        f"{lonNumber}_{latNumber}_{kk}"
+    )
+    inds_file = (
+        f"inds_{mesh.n2d}_{left}_{right}_{down}_{up}_"
+        f"{lonNumber}_{latNumber}_{kk}"
+    )
+
+    distances_paths = [
+        distances_path,
+        os.path.join(mesh.path, distances_file),
+        os.path.join(CACHE_DIR, distances_file),
+    ]
+    inds_paths = [
+        inds_path,
+        os.path.join(mesh.path, inds_file),
+        os.path.join(CACHE_DIR, inds_file),
+    ]
+
+    distances = inds = None
+
+    # Try loading cached distances
+    for path in filter(None, distances_paths):
+        if os.path.isfile(path):
+            try:
+                distances = joblib.load(path)
+                break
+            except PermissionError:
+                pass
+
+    # Try loading cached indices
+    for path in filter(None, inds_paths):
+        if os.path.isfile(path):
+            try:
+                inds = joblib.load(path)
+                break
+            except PermissionError:
+                pass
+
+    # Compute if not available
+    if distances is None or inds is None:
+        distances, inds = create_indexes_and_distances(
+            mesh, lons, lats, k=kk
+        )
+
+        if dumpfile:
+            for path in distances_paths:
+                if path is None:
+                    continue
+                try:
+                    joblib.dump(distances, path)
+                    break
+                except PermissionError:
+                    pass
+
+            for path in inds_paths:
+                if path is None:
+                    continue
+                try:
+                    joblib.dump(inds, path)
+                    break
+                except PermissionError:
+                    pass
+
+    # Nearest-neighbor interpolation
+    data_interpolated = data[inds]
+    data_interpolated[distances >= radius_of_influence] = np.nan
+    data_interpolated = data_interpolated.reshape(lons.shape)
+
+    return np.ma.masked_invalid(data_interpolated)
+
+# Loop over variables and interpolate
 for variable in variables:
     print(f"Interpolating variable: {variable}")
 
+    output_file = f"{dest_path}{variable}.interp.{min_lon}E.{max_lon}E.{lon_increment}E.{min_lat}N.{min_lat}N.{lat_increment}N.fesom.{year}.nc"
+    if isfile(output_file):
+        print(f"Output file already exists, skipping: {output_file}")
+        continue
+
     # Load the variable data
     data_file = f"{base_path_model}{variable}.fesom.{year}.nc"
-    ds = xr.open_dataset(data_file)
+    ds = xr.open_dataset(data_file, decode_times=time_coder)
 
     # allocate array for 2D and 3D variables
     ndims = len(list(ds.dims))
@@ -127,8 +303,8 @@ for variable in variables:
             data = ds[variable].isel(time=i).values
 
             # Interpolate to regular grid
-            interp_2D = pf.fesom2regular(
-                data, mesh, lon_grid, lat_grid, how="nn", radius_of_influence=50000, dumpfile=True
+            interp_2D = fesom2regular_nn(
+                data, mesh, lon_grid, lat_grid, radius_of_influence=radius_of_influence, dumpfile=False
             )
 
             # Add vertical level and time dimension
@@ -153,8 +329,8 @@ for variable in variables:
                 data = ds[variable].isel(time=i, nz1=j).values
 
                 # Interpolate to regular grid
-                interp_2D = pf.fesom2regular(
-                    data, mesh, lon_grid, lat_grid, how="nn", radius_of_influence=50000, dumpfile=True
+                interp_2D = fesom2regular_nn(
+                    data, mesh, lon_grid, lat_grid, radius_of_influence=radius_of_influence, dumpfile=False
                 )
 
                 # Add vertical level and time dimension
@@ -167,7 +343,6 @@ for variable in variables:
         )
 
     # Save the interpolated data
-    output_file = f"{dest_path}{variable}.interp.{min_lon}E.{max_lon}E.{lon_increment}E.{min_lat}N.{min_lat}N.{lat_increment}N.fesom.{year}.nc"
     interp_ds.to_netcdf(output_file)
 
     print(f"Saved interpolated data to: {output_file}")
