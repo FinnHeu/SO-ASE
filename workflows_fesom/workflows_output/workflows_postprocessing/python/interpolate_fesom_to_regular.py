@@ -80,15 +80,22 @@ variables = [
 # Destination path for interpolated data
 dest_path = base_path_model + "/gridded/"
 
-# Logging for confirmation
-print(f"Processing year: {year}")
-print(f"Base path model: {base_path_model}")
-print(f"Base path mesh: {base_path_mesh}")
-print(f"Base path output: {dest_path}")
-print(f"Latitude bounds: {min_lat} to {max_lat} (step {lat_increment})")
-print(f"Longitude bounds: {min_lon} to {max_lon} (step {lon_increment})")
-print(f"Radius of influence: {radius_of_influence}")
-print(f"Variables to interpolate: {variables}")
+# Print a nice header
+header = f"""
+{'='*78}
+{' '*20}FESOM2 to Regular Grid Interpolation{' '*20}
+{'='*78}
+Year: {year}
+Model path: {base_path_model}
+Mesh path: {base_path_mesh}
+Output path: {dest_path}
+Grid bounds: [{min_lat}, {max_lat}] latitude, [{min_lon}, {max_lon}] longitude
+Grid resolution: {lat_increment}° x {lon_increment}°
+Radius of influence: {radius_of_influence/1000:.1f} km
+Variables: {', '.join(variables)}
+{'='*78}
+"""
+print(header)
 
 # Ensure the output directory exists
 if not isdir(dest_path):
