@@ -1,20 +1,21 @@
 #!/bin/bash
 #SBATCH --job-name=interpolate_fesom
-#SBATCH -p shared
+#SBATCH -p compute
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
 #SBATCH --time=00:05:00
 #SBATCH -o slurm-out.out
 #SBATCH -e slurm-err.out
 #SBATCH -A ab0995
-#SBATCH --array=1650-1849
+#SBATCH --array=1650-1849%128
 
 # Set library path so pyproj finds compatible libstdc++
 #export LD_LIBRARY_PATH=$HOME/.conda/envs/pyfesom2/lib:$LD_LIBRARY_PATH
 
 ############ Define Parameters ############
-base_path_model="/work/ab0995/a270186/esm_tools/runtime/awicm3-develop/production_OSM26/PICTRL_CORE2ice_1650_1850/outdata/fesom/"
-base_path_mesh="/work/ab0995/a270186/model_inputs/fesom2/mesh/CORE2ice/" 
+base_path_model="/work/ab0995/a270186/esm_tools/runtime/awicm3-develop/production_OSM26/PICTRL_CORE2_1650_1850_2/outdata/fesom/"
+base_path_mesh="/work/ab0995/a270186/model_inputs/fesom2/mesh/CORE2/" 
 variables_to_interpolate=("a_ice" "sst" "sss" "MLD1")  
 min_lat=-90
 max_lat=90
