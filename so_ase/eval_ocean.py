@@ -6,6 +6,7 @@ import pyfesom2 as pf
 from scipy.stats import linregress
 from scipy.interpolate import griddata
 from os.path import isfile
+from os import remove
 from .helpers_mesh import find_nodes_in_box, add_element_volumes, build_cavity_mask
 
 # To Do:
