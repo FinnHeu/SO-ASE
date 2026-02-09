@@ -88,8 +88,8 @@ path_restart_src_oce = f"/work/bb1469/a270092/runtime/awicm3-v3.3.0/SPIN/restart
 path_restart_src_ice = f"/work/bb1469/a270092/runtime/awicm3-v3.3.0/SPIN/restart/fesom/fesom.{restart_year}.ice.restart/"
 
 # Restart files on CORE2ice mesh (templates)
-path_restart_tgt_oce = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/CORE2ice/v2.7.1/fesom.1600.oce.restart/"
-path_restart_tgt_ice = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/CORE2ice/v2.7.1/fesom.1600.ice.restart/"
+path_restart_tgt_oce = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/CORE2ice/v2.6.8/fesom.1859.oce.restart/"
+path_restart_tgt_ice = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/CORE2ice/v2.6.8/fesom.1859.ice.restart/"
 
 # Restart Destination
 path_dst_restarts_oce = f"/work/ab0995/a270186/esm_tools/runtime/awicm3-v3.3.0/preproduction/restarts_CORE2_to_CORE2ice/SPIN/fesom.{restart_year}.oce.restart/"
@@ -102,6 +102,8 @@ path_dst_plots = "./plots/"
 # Coupled Model (AWI-CM3 with FESOM2.7) also requires ice_temp.nc and ice_albedo.nc
 is_coupled = True
 
+# Path to restart files on target mesh ( ---> fesom v2.7 <---  ) for masking cavities
+path_restart_tgt_oce_v27 = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/CORE2ice/v2.7.1/fesom.1600.oce.restart/"
 
 # =============================================================================
 # ============================ SET LOG FILES ==================================
@@ -194,8 +196,8 @@ def interpolate_extrapolate_2D(varname, path_restart_src, path_restart_tgt, mapp
     # Map source data (without cavity) to destination grid (with cavity)
     data_int = data_src[mapper_nodes]
     
-    # Force cavity nodes to 0
-    data_int[data_mask == 0] = 0
+    # Force bathymetry and cavity nodes to 0
+    data_int[data_mask == 0] = 0 # cavity and bathymetry are all 0
     
     # Make a deep copy of destination restart
     ds_int = ds_tgt.copy()
@@ -269,6 +271,9 @@ def interpolate_extrapolate_3D(varname, path_restart_src, path_restart_tgt, mapp
         data_src = ds_src[varname].values
         data_dst = ds_tgt[varname].values
 
+        ###---> Make sure the are no NaN values in the source data
+        data_src[~np.isfinite(data_src)] = 0
+        
         ###---> Apply mapping to source data
         data_int = data_src[:, mapper_nodes]
     
@@ -385,21 +390,23 @@ def plot_mapper(mapper, lon_src, lat_src, lon_tgt, lat_tgt, horiz, path_dst_plot
     plt.savefig(f"{path_dst_plots}{filename}", bbox_inches='tight', dpi=300)
     plt.close()
 
-def plot_interpolated_extrapolated_field(path_src, path_int, varname, lon_src, lat_src, lon_int, lat_int, path_dst_plots, n=20, level=15):
+def plot_interpolated_extrapolated_field(path_src, path_int, path_restart_tgt, varname, lon_src, lat_src, lon_int, lat_int, path_dst_plots, n=20, level=15):
     
     print(f"Plotting comparison of source and interpolated/extrapolated field for variable: {varname}")
     print(' ')
 
     data_src = xr.open_dataset(f"{path_src}{varname}.nc").isel(time=-1)[varname].values
     data_int = xr.open_dataset(f"{path_int}{varname}.nc").isel(time=-1)[varname].values
+    data_tgt = xr.open_dataset(f"{path_restart_tgt}{varname}.nc").isel(time=-1)[varname].values
 
     if len(data_src.shape) == 2:
         data_src = data_src[level,:]
         data_int = data_int[level,:]
+        data_tgt = data_tgt[level,:]
 
     box = [-180, 180, -90, 90]
     
-    fig, ax = plt.subplots(1,2, figsize=(40,15), subplot_kw=dict(projection=ccrs.PlateCarree()))
+    fig, ax = plt.subplots(1,3, figsize=(40,15), subplot_kw=dict(projection=ccrs.PlateCarree()))
     
     for axis in ax:
         so.create_map(axis, extent=box, land=True, coastline=True, circular=False)
@@ -424,8 +431,13 @@ def plot_interpolated_extrapolated_field(path_src, path_int, varname, lon_src, l
     try:
         cb = ax[0].tricontourf(lon_src[::n], lat_src[::n], data_src[::n], levels=lev, cmap='viridis', transform=ccrs.PlateCarree())
         ax[1].tricontourf(lon_int[::n], lat_int[::n], data_int[::n], levels=lev, cmap='viridis', transform=ccrs.PlateCarree())
+        ax[2].tricontourf(lon_int[::n], lat_int[::n], data_tgt[::n], levels=lev, cmap='viridis', transform=ccrs.PlateCarree())
 
         plt.colorbar(cb, ax=ax, shrink=.7)
+
+        ax[0].set_title('Source')
+        ax[1].set_title('Interpolated/Extrapolated')
+        ax[2].set_title('Target')
 
     except:
         print('Plotting failed!')
@@ -476,12 +488,12 @@ if __name__ == "__main__":
     # ======================== 2D nodal fiels (time, node) ========================
     # =============================================================================
     varnames_2D_node = ['ssh', 'ssh_rhs_old', 'hbar']
-    mask_file = f"{path_restart_tgt_oce}ssh.nc"
+    mask_file = f"{path_restart_tgt_oce_v27}ssh.nc"
 
     for varname in varnames_2D_node:
-        interpolate_extrapolate_2D(varname, path_restart_src_oce, path_restart_tgt_oce, mapper_nodes, path_dst_restarts_oce, mask_file, mask_file_varname='ssh',t_step=-1, verbose=True)
+        interpolate_extrapolate_2D(varname, path_restart_src_oce, path_restart_tgt_oce, mapper_nodes, path_dst_restarts_oce, mask_file, mask_file_varname='ssh', t_step=-1, verbose=True)
         if plot:
-            plot_interpolated_extrapolated_field(path_restart_src_oce, path_dst_restarts_oce, varname, node_lon_src, node_lat_src, node_lon_tgt, node_lat_tgt, path_dst_plots)
+            plot_interpolated_extrapolated_field(path_restart_src_oce, path_dst_restarts_oce, path_restart_tgt_oce, varname, node_lon_src, node_lat_src, node_lon_tgt, node_lat_tgt, path_dst_plots)
 
     varnames_2D_node = ['area', 'hsnow', 'hice', 'uice', 'vice']
     if is_coupled:
@@ -490,7 +502,7 @@ if __name__ == "__main__":
     for varname in varnames_2D_node:
         interpolate_extrapolate_2D(varname, path_restart_src_ice, path_restart_tgt_ice, mapper_nodes, path_dst_restarts_ice, mask_file, mask_file_varname='ssh', t_step=-1, verbose=True)
         if plot:
-            plot_interpolated_extrapolated_field(path_restart_src_ice, path_dst_restarts_ice, varname, node_lon_src, node_lat_src, node_lon_tgt, node_lat_tgt, path_dst_plots)
+            plot_interpolated_extrapolated_field(path_restart_src_ice, path_dst_restarts_ice, path_restart_tgt_ice, varname, node_lon_src, node_lat_src, node_lon_tgt, node_lat_tgt, path_dst_plots)
 
     # =============================================================================
     # ======================== 3D nodal/elem fiels (time, nz_1/nz, node/elem) =====
@@ -500,14 +512,14 @@ if __name__ == "__main__":
     for varname in varnames_3D_node:
         interpolate_extrapolate_3D(varname, path_restart_src_oce, path_restart_tgt_oce, mapper_nodes, path_dst_restarts_oce, t_step=-1, verbose=True)
         if plot:
-            plot_interpolated_extrapolated_field(path_restart_src_oce, path_dst_restarts_oce, varname, node_lon_src, node_lat_src, node_lon_tgt, node_lat_tgt, path_dst_plots)
+            plot_interpolated_extrapolated_field(path_restart_src_oce, path_dst_restarts_oce, path_restart_tgt_oce, varname, node_lon_src, node_lat_src, node_lon_tgt, node_lat_tgt, path_dst_plots)
 
 
     varnames_3D_element = ['u', 'v', 'vrhs_AB', 'urhs_AB']
     for varname in varnames_3D_element:
         interpolate_extrapolate_3D(varname, path_restart_src_oce, path_restart_tgt_oce, mapper_elements, path_dst_restarts_oce, t_step=-1, verbose=True)
         if plot:
-            plot_interpolated_extrapolated_field(path_restart_src_oce, path_dst_restarts_oce, varname, elem_lon_src, elem_lat_src, elem_lon_tgt, elem_lat_tgt, path_dst_plots)
+            plot_interpolated_extrapolated_field(path_restart_src_oce, path_dst_restarts_oce, path_restart_tgt_oce, varname, elem_lon_src, elem_lat_src, elem_lon_tgt, elem_lat_tgt, path_dst_plots)
 
 print('=============================================================================')
 print('======================== EXTRAPOLATION COMPLETE ============================')
