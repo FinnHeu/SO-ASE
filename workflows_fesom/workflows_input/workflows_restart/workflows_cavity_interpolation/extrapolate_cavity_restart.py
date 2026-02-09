@@ -83,17 +83,17 @@ path_mesh_src = "/work/ab0995/a270186/model_inputs/fesom2/mesh/CORE2/"
 path_mesh_tgt = "/work/ab0995/a270186/model_inputs/fesom2/mesh/CORE2ice/"
 
 # Restart files on CORE2 mesh
-restart_year = 1630
-path_restart_src_oce = f"/work/ab0995/a270186/esm_tools/runtime/awicm3-develop/preproduction/TCO95L91CORE2_baseline/restart/fesom/fesom.{restart_year}.oce.restart/"
-path_restart_src_ice = f"/work/ab0995/a270186/esm_tools/runtime/awicm3-develop/preproduction/TCO95L91CORE2_baseline/restart/fesom/fesom.{restart_year}.ice.restart/"
+restart_year = 1849
+path_restart_src_oce = f"/work/bb1469/a270092/runtime/awicm3-v3.3.0/SPIN/restart/fesom/fesom.{restart_year}.oce.restart/"
+path_restart_src_ice = f"/work/bb1469/a270092/runtime/awicm3-v3.3.0/SPIN/restart/fesom/fesom.{restart_year}.ice.restart/"
 
 # Restart files on CORE2ice mesh (templates)
-path_restart_tgt_oce = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/CORE2ice/fesom.1600.oce.restart/"
-path_restart_tgt_ice = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/CORE2ice/fesom.1600.ice.restart/"
+path_restart_tgt_oce = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/CORE2ice/v2.7.1/fesom.1600.oce.restart/"
+path_restart_tgt_ice = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/CORE2ice/v2.7.1/fesom.1600.ice.restart/"
 
 # Restart Destination
-path_dst_restarts_oce = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/TCO95L91CORE2ice_branchoff/fesom.{restart_year}.oce.restart/"
-path_dst_restarts_ice = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/TCO95L91CORE2ice_branchoff/fesom.{restart_year}.ice.restart/"
+path_dst_restarts_oce = f"/work/ab0995/a270186/esm_tools/runtime/awicm3-v3.3.0/preproduction/restarts_CORE2_to_CORE2ice/SPIN/fesom.{restart_year}.oce.restart/"
+path_dst_restarts_ice = f"/work/ab0995/a270186/esm_tools/runtime/awicm3-v3.3.0/preproduction/restarts_CORE2_to_CORE2ice/SPIN/fesom.{restart_year}.ice.restart/"
 
 # Plots Destination
 plot = True
@@ -102,9 +102,17 @@ path_dst_plots = "./plots/"
 # Coupled Model (AWI-CM3 with FESOM2.7) also requires ice_temp.nc and ice_albedo.nc
 is_coupled = True
 
+
 # =============================================================================
 # ============================ SET LOG FILES ==================================
 # =============================================================================
+
+# Create destination directories if they do not exist
+if not os.path.isdir(path_dst_restarts_oce):
+    os.makedirs(path_dst_restarts_oce)
+if not os.path.isdir(path_dst_restarts_ice):
+    os.makedirs(path_dst_restarts_ice)
+
 # Determine the parent folder of path_dst_restarts_oce
 log_file = os.path.join(os.path.dirname(path_dst_restarts_oce.rstrip('/')), 'extrapolate_cavity_restart.log')
 
@@ -260,7 +268,7 @@ def interpolate_extrapolate_3D(varname, path_restart_src, path_restart_tgt, mapp
         ###---> Extract array of source data and destination data
         data_src = ds_src[varname].values
         data_dst = ds_tgt[varname].values
-        
+
         ###---> Apply mapping to source data
         data_int = data_src[:, mapper_nodes]
     
@@ -432,11 +440,6 @@ if __name__ == "__main__":
     print('======================== EXTRAPOLATE CAVITY RESTARTS ========================')
     print('=============================================================================')
     print(' ')
-
-    if not os.path.isdir(path_dst_restarts_oce):
-        os.makedirs(path_dst_restarts_oce)
-    if not os.path.isdir(path_dst_restarts_ice):
-        os.makedirs(path_dst_restarts_ice)
 
     # =============================================================================
     # ============================ READ MESHES =================================
