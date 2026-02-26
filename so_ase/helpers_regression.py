@@ -62,13 +62,16 @@ def regression2D_fesom(src_path, mesh_diag_path, years=(2011, 2024), box=[-180, 
     
     inds = find_nodes_in_box(mesh_diag_path, box)
 
+    # Open files with cftime decoder
+    time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+
     if log:
         print('Loading files...')
         if depth is not None:
             print(f'Chosen depth level: {depth}m')
-            ds = xr.open_mfdataset(files2open).isel(nod2=inds).sel(nz1=depth, method='nearest').squeeze().load()
+            ds = xr.open_mfdataset(files2open, decode_times=time_coder).isel(nod2=inds).sel(nz1=depth, method='nearest').squeeze().load()
         else:        
-            ds = xr.open_mfdataset(files2open).isel(nod2=inds).load()
+            ds = xr.open_mfdataset(files2open, decode_times=time_coder).isel(nod2=inds).load()
     if log:
         for f in files2open:
             print(f'Files loaded: {f}')
@@ -442,13 +445,16 @@ def anomaly2D_fesom(src_path, mesh_diag_path, ref_period=(2011, 2024), box=[-180
     
     inds = find_nodes_in_box(mesh_diag_path, box)
 
+    # Open files with cftime decoder
+    time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+
     if log:
         print('Loading files...')
         if depth is not None:
             print(f'Chosen depth level: {depth}m')
-            ds = xr.open_mfdataset(files2open).isel(nod2=inds).sel(nz1=depth, method='nearest').squeeze().load()
+            ds = xr.open_mfdataset(files2open, decode_times=time_coder).isel(nod2=inds).sel(nz1=depth, method='nearest').squeeze().load()
         else:        
-            ds = xr.open_mfdataset(files2open).isel(nod2=inds).load()
+            ds = xr.open_mfdataset(files2open, decode_times=time_coder).isel(nod2=inds).load()
     if log:
         for f in files2open:
             print(f'Files loaded: {f}')
