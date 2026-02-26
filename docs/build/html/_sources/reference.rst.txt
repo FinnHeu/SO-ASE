@@ -1,8 +1,0 @@
-Reference
-=========
-
-.. automodule:: so_ase.eval_ocean
-   :members:
-   :undoc-members:
-   :show-inheritance:
-        

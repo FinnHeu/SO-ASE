@@ -1,18 +1,18 @@
-.. so-ase documentation master file, created by
-   sphinx-quickstart on Fri Dec 19 12:25:29 2025.
+.. so_ase documentation master file, created by
+   sphinx-quickstart on Thu Feb 26 21:05:23 2026.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-so-ase documentation
+so_ase documentation
 ====================
 
 Add your content using ``reStructuredText`` syntax. See the
 `reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
 documentation for details.
 
+.. include modules.rst
 
 .. toctree::
+   modules
    :maxdepth: 2
    :caption: Contents:
-
-   reference

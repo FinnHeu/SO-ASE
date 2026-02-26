@@ -1,9 +1,7 @@
-SO-ASE
+so_ase
 ======
 
 .. toctree::
    :maxdepth: 4
 
-   setup
    so_ase
-   zenodo_upload
