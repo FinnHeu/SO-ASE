@@ -1,6 +1,6 @@
 # so_ase.eval_ocean.fesom_timeseries_of_mean_vertical_profile_in_region
 
-### so_ase.eval_ocean.fesom_timeseries_of_mean_vertical_profile_in_region(src_path, mesh_diag_path, years=(1979, 2015), box=[-180, 180, -90, -60], varname='temp', log=True)
+### fesom_timeseries_of_mean_vertical_profile_in_region(src_path, mesh_diag_path, years=(1979, 2015), box=[-180, 180, -90, -60], varname='temp', log=True)
 
 Compute a time series of area-weighted mean vertical profiles for a specified region
 from FESOM2 model output.

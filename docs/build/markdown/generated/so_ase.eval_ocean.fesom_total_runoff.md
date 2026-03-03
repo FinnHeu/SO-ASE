@@ -1,6 +1,6 @@
 # so_ase.eval_ocean.fesom_total_runoff
 
-### so_ase.eval_ocean.fesom_total_runoff(src_path, meshpath, basin_mask_file, basins=[66], years=(1979, 2015), which='solid', ori=False, log=False, savepath='./', replace=False)
+### fesom_total_runoff(src_path, meshpath, basin_mask_file, basins=[66], years=(1979, 2015), which='solid', ori=False, log=False, savepath='./', replace=False)
 
 Calculate total runoff for specified basins from FESOM output files.
 

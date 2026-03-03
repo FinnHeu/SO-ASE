@@ -3,7 +3,7 @@ sphinx-quickstart on Thu Feb 26 21:05:23 2026.
 You can adapt this file completely to your liking, but it should at least
 contain the root `toctree` directive. -->
 
-# so_ase documentation
+# SO-ASE documentation
 
 # Contents:
 

@@ -6,9 +6,9 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'so_ase'
-copyright = '2026, so_ase'
-author = 'so_ase'
+project = 'SO-ASE'
+copyright = '2026, SO-ASE'
+author = 'SO-ASE'
 
 import os
 import sys
@@ -25,6 +25,7 @@ templates_path = ['_templates']
 exclude_patterns = []
 
 autosummary_generate = True
+add_module_names = False
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

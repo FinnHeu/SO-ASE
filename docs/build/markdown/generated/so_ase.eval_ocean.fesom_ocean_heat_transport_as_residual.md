@@ -1,6 +1,6 @@
 # so_ase.eval_ocean.fesom_ocean_heat_transport_as_residual
 
-### so_ase.eval_ocean.fesom_ocean_heat_transport_as_residual(src_path, mesh_diag_path, ref_date='2000-01-31', eval_date='2002-01-31', box=[-180, 180, -90, -60], rho=1028, cp=4190, log=True)
+### fesom_ocean_heat_transport_as_residual(src_path, mesh_diag_path, ref_date='2000-01-31', eval_date='2002-01-31', box=[-180, 180, -90, -60], rho=1028, cp=4190, log=True)
 
 Compute the ocean heat transport (OHT) into a region of interest during a particular period as the residual of the total surface heat flux during the period and ocean heat
 content change between the first and last timestep of the period, using FESOM2 model output.
