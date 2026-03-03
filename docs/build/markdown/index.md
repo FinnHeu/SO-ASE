@@ -8,5 +8,5 @@ contain the root `toctree` directive. -->
 # Contents:
 
 * [SO-ASE](modules.md)
-  * [Atmosphere](modules.md#atmosphere)
   * [Ocean](modules.md#ocean)
+  * [Sea Ice](modules.md#sea-ice)

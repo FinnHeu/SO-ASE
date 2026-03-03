@@ -19,7 +19,8 @@ sys.path.insert(0, os.path.abspath('../..'))
 
 extensions = [ 'sphinx.ext.autodoc',  # to autogenerate .rst files
                'sphinx.ext.napoleon',
-               'sphinx.ext.autosummary']
+               'sphinx.ext.autosummary',
+	       'sphinx_markdown_builder',]
 
 templates_path = ['_templates']
 exclude_patterns = []

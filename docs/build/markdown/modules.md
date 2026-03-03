@@ -1,7 +1,5 @@
 # SO-ASE
 
-## Atmosphere
-
 ## Ocean
 
 | [`fesom_ocean_heat_transport_as_residual`](generated/so_ase.eval_ocean.fesom_ocean_heat_transport_as_residual.md#so_ase.eval_ocean.fesom_ocean_heat_transport_as_residual)(...)                                        | Compute the ocean heat transport (OHT) into a region of interest during a particular period as the residual of the total surface heat flux during the period and ocean heat content change between the first and last timestep of the period, using FESOM2 model output.   |
@@ -9,3 +7,11 @@
 | [`fesom_timeseries_of_mean_vertical_profile_in_region`](generated/so_ase.eval_ocean.fesom_timeseries_of_mean_vertical_profile_in_region.md#so_ase.eval_ocean.fesom_timeseries_of_mean_vertical_profile_in_region)(...) | Compute a time series of area-weighted mean vertical profiles for a specified region from FESOM2 model output.                                                                                                                                                             |
 | [`fesom_total_kinetic_energy`](generated/so_ase.eval_ocean.fesom_total_kinetic_energy.md#so_ase.eval_ocean.fesom_total_kinetic_energy)(src_path, ...[, ...])                                                           |                                                                                                                                                                                                                                                                            |
 | [`fesom_total_runoff`](generated/so_ase.eval_ocean.fesom_total_runoff.md#so_ase.eval_ocean.fesom_total_runoff)(src_path, meshpath, ...)                                                                                | Calculate total runoff for specified basins from FESOM output files.                                                                                                                                                                                                       |
+
+## Sea Ice
+
+| [`fesom_sea_ice_area`](generated/so_ase.eval_sea_ice.fesom_sea_ice_area.md#so_ase.eval_sea_ice.fesom_sea_ice_area)(src_path, mesh_diag_path)   | Compute and save total sea ice area time series from FESOM2 output within a specified geographic bounding box.   |
+|------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
+| [`fesom_ice_volume`](generated/so_ase.eval_sea_ice.fesom_ice_volume.md#so_ase.eval_sea_ice.fesom_ice_volume)(src_path, mesh_diag_path[, ...])  | Compute and save total sea ice volume time series from FESOM2 output within a specified geographic bounding box. |
+| [`nsidc_ice_area`](generated/so_ase.eval_sea_ice.nsidc_ice_area.md#so_ase.eval_sea_ice.nsidc_ice_area)(src_path[, years, box, ...])            | Compute total sea ice area from NSIDC CDR data within a geographic region.                                       |
+| [`hadlsst_ice_area`](generated/so_ase.eval_sea_ice.hadlsst_ice_area.md#so_ase.eval_sea_ice.hadlsst_ice_area)(src_path[, years, box, ...])      | Compute total sea ice area from HadlSST_ice data within a geographic region.                                     |
