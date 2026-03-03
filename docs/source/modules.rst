@@ -1,20 +1,14 @@
 SO-ASE
 ======
 
-.. currentmodule:: so_ase
-
 Atmosphere
 ----------
 
-.. autosummary::
-   :toctree: generated
-
+.. toctree::
    eval_atmosphere
 
 Ocean
 -----
 
-.. autosummary::
-   :toctree: generated
-
+.. toctree::
    eval_ocean
