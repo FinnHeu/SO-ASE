@@ -5,13 +5,8 @@ contain the root `toctree` directive. -->
 
 # so_ase documentation
 
-<!--Add your content using `reStructuredText` syntax. See the
-[reStructuredText](https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html)
-documentation for details.-->
-
-<!-- include modules.rst -->
-
 # Contents:
 
-* [so_ase](modules.md)
-  * [so_ase package](so_ase.md)
+* [SO-ASE](modules.md)
+  * [Atmosphere](modules.md#atmosphere)
+  * [Ocean](modules.md#ocean)
