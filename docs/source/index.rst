@@ -8,5 +8,5 @@ SO-ASE documentation
 
 .. toctree::
    modules
-   :maxdepth: 2
+   :maxdepth: 4
    :caption: Contents:

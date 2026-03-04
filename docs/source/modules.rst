@@ -4,25 +4,68 @@ SO-ASE
 Ocean
 -----
 
-.. currentmodule:: so_ase.eval_ocean
-
-.. autosummary::
-   :toctree: generated/
-
-   fesom_ocean_heat_transport_as_residual
-   fesom_timeseries_of_mean_vertical_profile_in_region
-   fesom_total_kinetic_energy
-   fesom_total_runoff
+.. automodule:: so_ase.eval_ocean
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 Sea Ice
 -------
 
-.. currentmodule:: so_ase.eval_sea_ice
+.. automodule:: so_ase.eval_sea_ice
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
-.. autosummary::
-   :toctree: generated/
+Icebergs
+--------
 
-   fesom_sea_ice_area
-   fesom_ice_volume
-   nsidc_ice_area
-   hadlsst_ice_area
+.. automodule:: so_ase.eval_icebergs
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Ice cavities
+------------
+
+.. automodule:: so_ase.eval_cavity
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Mesh
+----
+
+.. automodule:: so_ase.helpers_mesh
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Plots
+-----
+
+.. automodule:: so_ase.helpers_plots
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: so_ase.plotting_maps
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Regression
+----------
+
+.. automodule:: so_ase.helpers_regression
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Miscellaneous
+-------------
+
+.. automodule:: so_ase.helpers_misc
+   :members:
+   :undoc-members:
+   :show-inheritance:
