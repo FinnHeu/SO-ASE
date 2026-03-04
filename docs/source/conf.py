@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath('../..'))
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [ 'sphinx.ext.autodoc',  # to autogenerate .rst files
-               'sphinx.ext.napoleon',
+               'numpydoc',
                'sphinx.ext.autosummary',
 	       'sphinx_markdown_builder',]
 

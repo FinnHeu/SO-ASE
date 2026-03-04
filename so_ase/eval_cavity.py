@@ -44,9 +44,6 @@ def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, mask, yea
     savepath : str, default './'
         Directory in which to save the output files. The files are created as
         ``subshelf_melt_<mask>.<year>.nc``.
-
-    # load mesh diagnostics
-    mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
     """
     
     # load mesh diag
