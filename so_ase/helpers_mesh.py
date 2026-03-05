@@ -6,6 +6,7 @@ import shapely.geometry as sh
 import math
 from pyproj import Proj, Transformer
 from collections import defaultdict, deque
+from scipy.interpolate import griddata
 from .helpers_misc import lon_to_360, read_kml_coords
 
 ###--------> 1. Read raw mesh files
@@ -44,12 +45,13 @@ def read_nodes(meshpath):
             
     return np.array(nodes_lon), np.array(nodes_lat), np.array(nodes_idx), np.array(nodes_coast)
 
-def read_elements(meshpath):
+def read_elements(meshpath, return_coordinates=False):
     """
     Reads element connectivity information from a `elem2d.out` file.
 
     Parameters:
         meshpath (str): Path to the directory containing `elem2d.out`.
+        return_coordinates (bool): If True, also return centroid coordinates of elements.
 
     Returns:
         array: A list of elements, where each element is a tuple
@@ -65,7 +67,18 @@ def read_elements(meshpath):
             n2 = int(parts[1]) - 1
             n3 = int(parts[2]) - 1
             elements.append((n1, n2, n3))
-    return np.array(elements)
+    
+    elements = np.array(elements)
+    
+    if return_coordinates:
+        # Get node coordinates
+        node_lon, node_lat, _, _ = read_nodes(meshpath)
+        # Calculate centroid coordinates for each element
+        elem_lon = node_lon[elements].mean(axis=1)
+        elem_lat = node_lat[elements].mean(axis=1)
+        return elements, elem_lon, elem_lat
+    else:
+        return elements
 
 def read_aux3d(meshpath):
     """
@@ -496,7 +509,125 @@ def build_runoff_basin_mask(meshpath, runoff_file, which='liquid'):
     return ds_basin
 
 
-###--------> 4. Add mesh diagnostics to fesom.mesh.diag.nc
+###--------> 4. Compute mesh resolution
+
+def compute_mesh_resolution(meshpath, R=6371000.0, interpolate2regular=False):
+    """
+    Computes the local mesh resolution for a FESOM2 unstructured triangular mesh.
+    
+    Resolution is defined as the great-circle distance between neighboring nodes.
+    For each unique edge in the mesh, the function returns the edge length (resolution)
+    and the midpoint coordinates.
+    
+    Parameters:
+        meshpath (str): Path to the directory containing `nod2d.out` and `elem2d.out`.
+        R (float): Earth's radius in meters (default: 6371000 m).
+        interpolate2regular (bool): If True, interpolate the resolution to a regular grid.
+    
+    Returns:
+        resolution (np.ndarray): 1D array of distances between neighboring nodes (meters).
+        lon_mid (np.ndarray): 1D array of edge midpoint longitudes (degrees).
+        lat_mid (np.ndarray): 1D array of edge midpoint latitudes (degrees).
+    """
+    # Read mesh data using existing infrastructure
+    node_lon, node_lat, node_idx, _ = read_nodes(meshpath)
+    elements = read_elements(meshpath)
+    
+    # Build edges from triangles: (n1,n2), (n2,n3), (n3,n1)
+    n1 = elements[:, 0]
+    n2 = elements[:, 1]
+    n3 = elements[:, 2]
+    
+    edges_a = np.column_stack([n1, n2])
+    edges_b = np.column_stack([n2, n3])
+    edges_c = np.column_stack([n3, n1])
+    
+    all_edges = np.vstack([edges_a, edges_b, edges_c])
+    
+    # Sort each edge so (i,j) and (j,i) become identical
+    sorted_edges = np.sort(all_edges, axis=1)
+    
+    # Remove duplicates
+    unique_edges = np.unique(sorted_edges, axis=0)
+    
+    # Extract node indices for each edge
+    idx_i = unique_edges[:, 0]
+    idx_j = unique_edges[:, 1]
+    
+    # Get coordinates for each node pair
+    lon_i = node_lon[idx_i]
+    lat_i = node_lat[idx_i]
+    lon_j = node_lon[idx_j]
+    lat_j = node_lat[idx_j]
+    
+    # Convert to radians for great-circle calculation
+    lon_i_rad = np.deg2rad(lon_i)
+    lat_i_rad = np.deg2rad(lat_i)
+    lon_j_rad = np.deg2rad(lon_j)
+    lat_j_rad = np.deg2rad(lat_j)
+    
+    # Haversine formula for great-circle distance
+    dlat = lat_j_rad - lat_i_rad
+    dlon = lon_j_rad - lon_i_rad
+    
+    a = np.sin(dlat / 2.0)**2 + np.cos(lat_i_rad) * np.cos(lat_j_rad) * np.sin(dlon / 2.0)**2
+    c = 2.0 * np.arcsin(np.sqrt(a))
+    resolution = R * c
+    
+    # Compute midpoint coordinates (simple arithmetic mean in degrees)
+    lon_mid = (lon_i + lon_j) / 2.0
+    lat_mid = (lat_i + lat_j) / 2.0
+
+    if interpolate2regular:
+        # define regular grid
+        lon_grid = np.linspace(-180, 180, 1440)
+        lat_grid = np.linspace(-90, 90, 720)
+
+        lon2d, lat2d = np.meshgrid(lon_grid, lat_grid)
+
+        # interpolate
+        res_grid = griddata(
+            (lon_mid, lat_mid),
+            resolution,
+            (lon2d, lat2d),
+            method="nearest"
+        )
+
+        # create xarray Dataset
+        ds = xr.Dataset(
+            data_vars={
+                "resolution": (("lat", "lon"), res_grid)
+            },
+            coords={
+                "lon": lon_grid,
+                "lat": lat_grid
+            },
+            attrs={
+                "description": "Interpolated FESOM2 mesh resolution",
+                "units": "meters"
+            }
+        )
+        return ds
+    else:
+        # create xarray Dataset with edge-based data
+        ds = xr.Dataset(
+            data_vars={
+                "resolution": (("edge",), resolution),
+                "lon_mid": (("edge",), lon_mid),
+                "lat_mid": (("edge",), lat_mid)
+            },
+            coords={
+                "edge": np.arange(len(resolution))
+            },
+            attrs={
+                "description": "FESOM2 mesh resolution at edge midpoints",
+                "units": "meters"
+            }
+        )
+        return ds
+
+
+###--------> 5. Add mesh diagnostics to fesom.mesh.diag.nc
 
 def add_nodal_volumes(mesh_diag):
     """
@@ -523,7 +654,7 @@ def add_element_volumes(mesh_diag):
     return mesh_diag
 
 
-###--------> 5. Miscellaneous mesh helper functions
+###--------> 6. Miscellaneous mesh helper functions
 
 def gridcell_area_hadley(ds, R=6371.0):
     """
