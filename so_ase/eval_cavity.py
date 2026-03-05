@@ -56,7 +56,7 @@ def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, mask, yea
         if mask['name'] == 'all':
             node_mask = build_cavity_mask(mesh_path, which='node')
         else:
-            node_mask = build_cavity_regional_mask(mesh_path, mask['kml_path'], which=mask['name'])
+            node_mask = build_cavity_regional_mask(mesh_path, mask['kml_path'], name=mask['name'], which='node')
     elif isinstance(mask, list) or isinstance(mask, np.array):
         node_mask = mask
     else:
@@ -159,7 +159,7 @@ def fesom_subshelf_heatflux(src_path, mesh_diag_path, mesh_path, mask, years=(19
         if mask['name'] == 'all':
             node_mask = build_cavity_mask(mesh_path, which='node')
         else:
-            node_mask = build_cavity_regional_mask(mesh_path, mask['kml_path'], which=mask['name'])
+            node_mask = build_cavity_regional_mask(mesh_path, mask['kml_path'], name=mask['name'], which='node')
     elif isinstance(mask, list) or isinstance(mask, np.array):
         node_mask = mask
     else:
@@ -385,7 +385,7 @@ def fesom_subshelf_hydrography(src_path, mesh_diag_path, mesh_path, mask, years=
         if mask['name'] == 'all':
             node_mask = build_cavity_mask(mesh_path, which='node')
         else:
-            node_mask = build_cavity_regional_mask(mesh_path, mask['kml_path'], which=mask['name'])
+            node_mask = build_cavity_regional_mask(mesh_path, mask['kml_path'], name=mask['name'], which='node')
     elif isinstance(mask, list) or isinstance(mask, np.array):
         node_mask = mask
     else:
