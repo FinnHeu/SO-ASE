@@ -374,34 +374,45 @@ def build_cavity_mask(meshpath, which='element'):
     
     return cavity_mask
 
-def build_cavity_regional_mask(meshpath, kml_path, which='Filchner-Ronne'):
+def build_cavity_regional_mask(meshpath, kml_path, name='Filchner-Ronne', which='node'):
     """
     Builds a regional cavity mask for nodes based on a KML-defined polygon.
     
     Parameters:
         meshpath (str): Path to the directory containing mesh files.
         kml_path (str): Path to the directory containing KML files.
-        which (str): Name of the region (used to select the KML file).
+        name (str): Name of the region (used to select the KML file).
+        which (str): 'element' to build mask for elements, 'node' for nodes.
     
     Returns:
-        array of bool: Regional cavity mask for nodes.
+        array of bool: Regional cavity mask.
     """
 
-    node_lon, node_lat, node_idx, node_coast = read_nodes(meshpath)
-    mask_cavity_nodes = build_cavity_mask(meshpath, which='node')
+    
+    if which == 'node':
+        lon, lat, node_idx, node_coast = read_nodes(meshpath)
+        mask_cavity = build_cavity_mask(meshpath, which='node')
+    elif which == 'element':
+        elem = read_elements(meshpath)
+        node_lon, node_lat, node_idx, node_coast = read_nodes(meshpath)
+        lon, lat  = node_lon[elem].mean(axis=1), node_lat[elem].mean(axis=1)
+        lev_cav = read_element_levels(meshpath, which='cavity', raw=False, python_indexing=False)
+        mask_cavity = lev_cav > 1
+    else:
+        raise ValueError(f"which must be 'node' or 'element', got {which}")
 
-    kml_file = f"{kml_path}{which}.kml"        
+    kml_file = f"{kml_path}{name}.kml"        
     coords = read_kml_coords(kml_file, close_ring=True)
 
-    if which == 'Ross':
-        node_lon = lon_to_360(node_lon)
+    if name == 'Ross':
+        lon = lon_to_360(lon)
     #    coords = [(i+360, j) for i, j in coords if i < 0]
         
     polygon = sh.Polygon(coords)
-    mask_region = mask_cavity_nodes.copy()
-    for i, b in enumerate(mask_cavity_nodes):
+    mask_region = mask_cavity.copy()
+    for i, b in enumerate(mask_cavity):
         if b:
-            point = sh.Point((node_lon[i], node_lat[i]))
+            point = sh.Point((lon[i], lat[i]))
             if not polygon.contains(point):
                 mask_region[i] = False
 
