@@ -152,30 +152,25 @@ def fesom_timeseries_of_mean_vertical_profile_in_region(
     Compute a time series of area-weighted mean vertical profiles for a specified region 
     from FESOM2 model output.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     src_path : str
         Path to the directory containing annual FESOM2 output files (e.g., temp.fesom.YYYY.nc).
-    
     mesh_diag_path : str
         Path to the directory containing the mesh diagnostic file (fesom.mesh.diag.nc).
-    
     years : tuple of int, optional
         Start and end year for the time series. Default is (1979, 2015).
-    
     box : list of float, optional
         Geographic bounds of the region of interest in the format [lon_min, lon_max, lat_min, lat_max].
         Default is global Southern Ocean: [-180, 180, -90, -60].
-    
     varname : str, optional
         Name of the variable to extract and average (must match variable name in NetCDF files).
         Default is 'temp'.
-    
     log : bool, optional
         Whether to print progress information. Default is True.
 
-    Returns:
-    --------
+    Returns
+    -------
     xarray.DataSet
         A time series of area-weighted mean vertical profiles in the specified region.
         The vertical levels are preserved along the 'nz' dimension.
