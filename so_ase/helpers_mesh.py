@@ -4,6 +4,8 @@ import xarray as xr
 import numpy as np
 import shapely.geometry as sh
 import math
+
+from scipy.spatial import cKDTree
 from pyproj import Proj, Transformer
 from collections import defaultdict, deque
 from scipy.interpolate import griddata
@@ -143,7 +145,7 @@ def read_cavity_depth_at_node(meshpath):
             depths.append(d)
     return np.array(depths)
 
-def level_idx_to_depth(meshpath, which='seafloor', raw=False):
+def level_idx_to_depth(meshpath, which='seafloor', raw=False, write=False):
     """
     Converts level indices to depth values for either seafloor or cavity levels.
     
@@ -151,6 +153,7 @@ def level_idx_to_depth(meshpath, which='seafloor', raw=False):
         meshpath (str): Path to the directory containing mesh files.
         which (str): either <seafloor> or <cavity> for last active layer or first active layer. 
         raw (bool): If True, reads raw level indices. If False, reads processed level indices.
+        write (bool): If True, writes depths line-by-line to depth@elem.out (seafloor) or cavity_depth@elem.out (cavity).
     
     Returns:
         array of float: A list of depth values, one for each element.
@@ -163,6 +166,16 @@ def level_idx_to_depth(meshpath, which='seafloor', raw=False):
     depth_levels, num_layer = read_depth_zlev(meshpath)
 
     depth = depth_levels[idx_layer]
+
+    if write:
+        if which == 'seafloor':
+            filename = f'{meshpath}depth@elem.out'
+        elif which == 'cavity':
+            filename = f'{meshpath}cavity_depth@elem.out'
+        with open(filename, 'w') as f:
+            for d in depth:
+                f.write(f'{d}\n')
+        print(f'Wrote: {filename}')
 
     return depth
 
@@ -653,8 +666,190 @@ def add_element_volumes(mesh_diag):
     mesh_diag['elem_volume'] = mesh_diag.elem_area * mesh_diag.layer_thickness
     return mesh_diag
 
+###--------> 6. Interpolation/Extrapolation
+def build_spherical_nn_mapper(lon_source, lat_source,
+                              lon_target, lat_target):
+    """
+    Build nearest-neighbor mapping between two sets of points
+    on a sphere (lon/lat in degrees). The KDTree is built on the source grid.
 
-###--------> 6. Miscellaneous mesh helper functions
+    Parameters
+    ----------
+    lon_source : array-like
+        Longitudes of source grid points (degrees).
+    lat_source : array-like
+        Latitudes of source grid points (degrees).
+    lon_target : array-like
+        Longitudes of target grid points (degrees).
+    lat_target : array-like
+        Latitudes of target grid points (degrees).
+
+    Returns
+    -------
+    mapping : ndarray
+        For each target point, the index of the nearest source point.
+    distances : ndarray
+        The spherical Euclidean distance in 3D Cartesian space.
+    """
+    # --- Convert degrees to radians ---
+    lon1 = np.radians(lon_source)
+    lat1 = np.radians(lat_source)
+    lon2 = np.radians(lon_target)
+    lat2 = np.radians(lat_target)
+
+    # --- Convert spherical coordinates to Cartesian ---
+    def sph2cart(lon, lat):
+        x = np.cos(lat) * np.cos(lon)
+        y = np.cos(lat) * np.sin(lon)
+        z = np.sin(lat)
+        return np.column_stack((x, y, z))
+
+    coords1 = sph2cart(lon1, lat1)
+    coords2 = sph2cart(lon2, lat2)
+
+    # --- KDTree on source grid ---
+    tree = cKDTree(coords1)
+
+    # --- Query nearest neighbor for every target point ---
+    distances, indices = tree.query(coords2, k=1)
+
+    return indices, distances
+
+###--------> 7. Build Land Sea Mask
+
+def build_land_sea_mask(meshpath, nlon=1440, nlat=720, cavity_is_land=True):
+    """
+    Build a regular lon-lat land-sea mask from a FESOM2 unstructured mesh.
+    
+    The mesh only contains ocean cells (land/continents are holes). Grid points
+    falling inside mesh triangles are marked as ocean, others as land.
+    
+    Parameters
+    ----------
+    meshpath : str
+        Path to mesh directory containing nod2d.out, elem2d.out, and cavity_elvls.out.
+    nlon : int
+        Number of longitude grid points (default: 1440 for 0.25° resolution).
+    nlat : int
+        Number of latitude grid points (default: 720 for 0.25° resolution).
+    cavity_is_land : bool
+        If True, sub-ice cavity cells (cavity_elvls > 1) are treated as land.
+    
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with 'mask' variable (1 = ocean, 0 = land) on regular lon-lat grid.
+    """
+    # Read mesh data
+    node_lon, node_lat, _, _ = read_nodes(meshpath)
+    elements = read_elements(meshpath)
+    
+    # Read cavity levels (values > 1 indicate cavity elements)
+    cavity_elvls = read_element_levels(meshpath, which='cavity', raw=False, python_indexing=False)
+    is_cavity = cavity_elvls > 1
+    
+    # Create regular grid
+    lon_grid = np.linspace(-180, 180, nlon, endpoint=False)
+    lat_grid = np.linspace(-90, 90, nlat, endpoint=False)
+    dlon = lon_grid[1] - lon_grid[0]
+    dlat = lat_grid[1] - lat_grid[0]
+    # Center grid cells
+    lon_grid = lon_grid + dlon / 2
+    lat_grid = lat_grid + dlat / 2
+    
+    # Initialize mask as land (0)
+    mask = np.zeros((nlat, nlon), dtype=np.int8)
+    
+    # Helper function: check if point is inside triangle using barycentric coordinates
+    def point_in_triangle(px, py, x1, y1, x2, y2, x3, y3):
+        denom = (y2 - y3) * (x1 - x3) + (x3 - x2) * (y1 - y3)
+        if abs(denom) < 1e-12:
+            return False
+        a = ((y2 - y3) * (px - x3) + (x3 - x2) * (py - y3)) / denom
+        b = ((y3 - y1) * (px - x3) + (x1 - x3) * (py - y3)) / denom
+        c = 1 - a - b
+        return (a >= 0) and (b >= 0) and (c >= 0)
+    
+    # Process each element
+    for eidx, (n1, n2, n3) in enumerate(elements):
+        # Skip cavity elements if they should be treated as land
+        if cavity_is_land and is_cavity[eidx]:
+            continue
+        
+        # Get triangle vertices
+        lons = np.array([node_lon[n1], node_lon[n2], node_lon[n3]])
+        lats = np.array([node_lat[n1], node_lat[n2], node_lat[n3]])
+        
+        # Handle triangles crossing the antimeridian (lon jump > 180°)
+        lon_range = lons.max() - lons.min()
+        if lon_range > 180:
+            # Shift longitudes to 0-360 range for this triangle
+            lons = np.where(lons < 0, lons + 360, lons)
+            lon_min, lon_max = lons.min(), lons.max()
+            lat_min, lat_max = lats.min(), lats.max()
+            
+            # Find grid cells that could intersect this triangle
+            i_min = max(0, int((lat_min - lat_grid[0]) / dlat) - 1)
+            i_max = min(nlat - 1, int((lat_max - lat_grid[0]) / dlat) + 1)
+            
+            for i in range(i_min, i_max + 1):
+                lat_pt = lat_grid[i]
+                for j in range(nlon):
+                    lon_pt = lon_grid[j]
+                    # Shift grid lon to 0-360 for comparison
+                    lon_pt_shifted = lon_pt if lon_pt >= 0 else lon_pt + 360
+                    if lon_pt_shifted < lon_min - dlon or lon_pt_shifted > lon_max + dlon:
+                        continue
+                    if point_in_triangle(lon_pt_shifted, lat_pt, 
+                                         lons[0], lats[0], lons[1], lats[1], lons[2], lats[2]):
+                        mask[i, j] = 1
+        else:
+            # Normal triangle
+            lon_min, lon_max = lons.min(), lons.max()
+            lat_min, lat_max = lats.min(), lats.max()
+            
+            # Find grid cell index range
+            j_min = max(0, int((lon_min - lon_grid[0]) / dlon) - 1)
+            j_max = min(nlon - 1, int((lon_max - lon_grid[0]) / dlon) + 1)
+            i_min = max(0, int((lat_min - lat_grid[0]) / dlat) - 1)
+            i_max = min(nlat - 1, int((lat_max - lat_grid[0]) / dlat) + 1)
+            
+            # Check grid cells within bounding box
+            for i in range(i_min, i_max + 1):
+                lat_pt = lat_grid[i]
+                for j in range(j_min, j_max + 1):
+                    lon_pt = lon_grid[j]
+                    if point_in_triangle(lon_pt, lat_pt, 
+                                         lons[0], lats[0], lons[1], lats[1], lons[2], lats[2]):
+                        mask[i, j] = 1
+    
+    # Create xarray Dataset
+    ds = xr.Dataset(
+        data_vars={
+            'mask': (['lat', 'lon'], mask)
+        },
+        coords={
+            'lon': lon_grid,
+            'lat': lat_grid
+        },
+        attrs={
+            'description': 'Land-sea mask from FESOM2 mesh',
+            'mask_convention': '1 = ocean, 0 = land',
+            'cavity_is_land': str(cavity_is_land),
+            'mesh_path': meshpath
+        }
+    )
+    
+    ds['mask'].attrs = {
+        'long_name': 'land-sea mask',
+        'units': '1',
+        'flag_values': [0, 1],
+        'flag_meanings': 'land ocean'
+    }
+    
+    return ds
+
+###--------> 8. Miscellaneous mesh helper functions
 
 def gridcell_area_hadley(ds, R=6371.0):
     """
