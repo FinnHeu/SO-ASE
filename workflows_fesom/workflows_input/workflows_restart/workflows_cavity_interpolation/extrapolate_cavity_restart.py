@@ -79,21 +79,21 @@ import sys
 # =============================================================================
 
 # Mesh directories
-path_mesh_src = "/work/ab0995/a270186/model_inputs/fesom2/mesh/CORE2/"
-path_mesh_tgt = "/work/ab0995/a270186/model_inputs/fesom2/mesh/CORE2ice/"
+path_mesh_src = "/work/ab0995/a270186/model_inputs/fesom2/mesh/DARS2/"
+path_mesh_tgt = "/work/ab0995/a270186/model_inputs/fesom2/mesh/DARS2cav/"
 
-# Restart files on CORE2 mesh
-restart_year = 1849
-path_restart_src_oce = f"/work/bb1469/a270092/runtime/awicm3-v3.3.0/SPIN/restart/fesom/fesom.{restart_year}.oce.restart/"
-path_restart_src_ice = f"/work/bb1469/a270092/runtime/awicm3-v3.3.0/SPIN/restart/fesom/fesom.{restart_year}.ice.restart/"
+# Restart files on DARS2 mesh
+path_restart_src_oce = f"/work/bb1469/a270089/runtime/awiesm3-v3.4.1/AWI-ESM3-VEG-HR-CMIP7-Spinup_cont1/restart/fesom/fesom.1399.oce.restart/"
+path_restart_src_ice = f"/work/bb1469/a270089/runtime/awiesm3-v3.4.1/AWI-ESM3-VEG-HR-CMIP7-Spinup_cont1/restart/fesom/fesom.1399.ice.restart/"
 
-# Restart files on CORE2ice mesh (templates)
-path_restart_tgt_oce = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/CORE2ice/v2.6.8/fesom.1859.oce.restart/"
-path_restart_tgt_ice = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/CORE2ice/v2.6.8/fesom.1859.ice.restart/"
+# Restart files on DARS2cav mesh (templates)
+path_restart_tgt_oce = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/DARS2cav/v2.7.1/fesom.1850.oce.restart/"
+path_restart_tgt_ice = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/DARS2cav/v2.7.1/fesom.1850.ice.restart/"
 
 # Restart Destination
-path_dst_restarts_oce = f"/work/ab0995/a270186/esm_tools/runtime/awicm3-v3.3.0/preproduction/restarts_CORE2_to_CORE2ice/SPIN/fesom.{restart_year}.oce.restart/"
-path_dst_restarts_ice = f"/work/ab0995/a270186/esm_tools/runtime/awicm3-v3.3.0/preproduction/restarts_CORE2_to_CORE2ice/SPIN/fesom.{restart_year}.ice.restart/"
+restart_year = 1849
+path_dst_restarts_oce = f"/work/ba1550/a270186/simulations/awicm3-develop/restarts_DARS2_to_DARS2cav/fesom.{restart_year}.oce.restart/"
+path_dst_restarts_ice = f"/work/ba1550/a270186/simulations/awicm3-develop/restarts_DARS2_to_DARS2cav/fesom.{restart_year}.ice.restart/"
 
 # Plots Destination
 plot = True
@@ -103,7 +103,7 @@ path_dst_plots = "./plots/"
 is_coupled = True
 
 # Path to restart files on target mesh ( ---> fesom v2.7 <---  ) for masking cavities
-path_restart_tgt_oce_v27 = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/CORE2ice/v2.7.1/fesom.1600.oce.restart/"
+path_restart_tgt_oce_v27 = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/DARS2cav/v2.7.1/fesom.1850.oce.restart/"
 
 # =============================================================================
 # ============================ SET LOG FILES ==================================
@@ -118,9 +118,22 @@ if not os.path.isdir(path_dst_restarts_ice):
 # Determine the parent folder of path_dst_restarts_oce
 log_file = os.path.join(os.path.dirname(path_dst_restarts_oce.rstrip('/')), 'extrapolate_cavity_restart.log')
 
-# Redirect stdout and stderr to the log file
-sys.stdout = open(log_file, 'w')
-sys.stderr = sys.stdout
+# Tee class to write to both terminal and log file
+class Tee:
+    def __init__(self, *files):
+        self.files = files
+    def write(self, obj):
+        for f in self.files:
+            f.write(obj)
+            f.flush()
+    def flush(self):
+        for f in self.files:
+            f.flush()
+
+# Redirect stdout and stderr to both terminal and log file
+log_file_handle = open(log_file, 'w')
+sys.stdout = Tee(sys.__stdout__, log_file_handle)
+sys.stderr = Tee(sys.__stderr__, log_file_handle)
 
 # =============================================================================
 # ================================= FUNCTIONS =================================
