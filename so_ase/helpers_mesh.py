@@ -311,6 +311,37 @@ def build_node_k_ring_neighbors(elements, node_idx, k):
     
     return k_ring
 
+def build_elem_k_ring_neighbors(elements, k):
+    """
+    Builds k-ring neighboring elements for each element in the mesh.
+    Parameters:
+        elements (array): An array of shape (ntri, 3) containing the node indices for each triangle.
+        k (int): The ring number to compute (e.g., 1 for 1-ring neighbors).
+    Returns:
+        list: A list of sets, where each set contains the k-ring neighboring element indices for the corresponding element.
+    """
+    neighbors_1 = build_element_neighbors(elements)
+    
+    N = len(neighbors_1)
+    k_ring = [set() for _ in range(N)]
+
+    for elem in range(N):
+        visited = {elem}            # avoid including the center element
+        queue = deque([(elem, 0)])
+
+        while queue:
+            current, dist = queue.popleft()
+            if dist == k:     # stop expanding
+                continue
+
+            for nb in neighbors_1[current]:
+                if nb not in visited:
+                    visited.add(nb)
+                    k_ring[elem].add(nb)   # add to result
+                    queue.append((nb, dist + 1))
+    
+    return k_ring
+
 def build_elements_of_nodes(elements, node_idx):
     """
     For each node in the mesh, return the list of element indices
