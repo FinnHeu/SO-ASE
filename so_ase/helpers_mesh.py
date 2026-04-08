@@ -748,7 +748,7 @@ def build_spherical_nn_mapper(lon_source, lat_source,
 
 ###--------> 7. Build Land Sea Mask
 
-def build_land_sea_mask(meshpath, nlon=1440, nlat=720, cavity_is_land=True):
+def build_land_sea_mask(meshpath, nlon=1440, nlat=720, has_cavity=True, cavity_is_land=True):
     """
     Build a regular lon-lat land-sea mask from a FESOM2 unstructured mesh.
     
@@ -763,8 +763,13 @@ def build_land_sea_mask(meshpath, nlon=1440, nlat=720, cavity_is_land=True):
         Number of longitude grid points (default: 1440 for 0.25° resolution).
     nlat : int
         Number of latitude grid points (default: 720 for 0.25° resolution).
+    has_cavity : bool
+        If True, the mesh contains cavity information (cavity_elvls.out) and 
+        cavity_is_land is used to decide how to treat cavity cells.
+        If False, all FESOM grid cells are treated as ocean.
     cavity_is_land : bool
-        If True, sub-ice cavity cells (cavity_elvls > 1) are treated as land.
+        Only used when has_cavity=True. If True, sub-ice cavity cells 
+        (cavity_elvls > 1) are treated as land.
     
     Returns
     -------
@@ -775,9 +780,14 @@ def build_land_sea_mask(meshpath, nlon=1440, nlat=720, cavity_is_land=True):
     node_lon, node_lat, _, _ = read_nodes(meshpath)
     elements = read_elements(meshpath)
     
-    # Read cavity levels (values > 1 indicate cavity elements)
-    cavity_elvls = read_element_levels(meshpath, which='cavity', raw=False, python_indexing=False)
-    is_cavity = cavity_elvls > 1
+    # Handle cavity information
+    if has_cavity:
+        # Read cavity levels (values > 1 indicate cavity elements)
+        cavity_elvls = read_element_levels(meshpath, which='cavity', raw=False, python_indexing=False)
+        is_cavity = cavity_elvls > 1
+    else:
+        # No cavity info: treat all elements as non-cavity (ocean)
+        is_cavity = np.zeros(len(elements), dtype=bool)
     
     # Create regular grid
     lon_grid = np.linspace(-180, 180, nlon, endpoint=False)
@@ -866,7 +876,8 @@ def build_land_sea_mask(meshpath, nlon=1440, nlat=720, cavity_is_land=True):
         attrs={
             'description': 'Land-sea mask from FESOM2 mesh',
             'mask_convention': '1 = ocean, 0 = land',
-            'cavity_is_land': str(cavity_is_land),
+            'has_cavity': str(has_cavity),
+            'cavity_is_land': str(cavity_is_land) if has_cavity else 'N/A',
             'mesh_path': meshpath
         }
     )
