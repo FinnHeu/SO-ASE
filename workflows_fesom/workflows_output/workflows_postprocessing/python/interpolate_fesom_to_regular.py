@@ -279,7 +279,7 @@ def fesom2regular_nn(
 for variable in variables:
     print(f"Interpolating variable: {variable}")
 
-    output_file = f"{dest_path}{variable}.interp.{min_lon}E.{max_lon}E.{lon_increment}E.{min_lat}N.{min_lat}N.{lat_increment}N.fesom.{year}.nc"
+    output_file = f"{dest_path}{variable}.interp.{min_lon}E.{max_lon}E.{lon_increment}E.{min_lat}N.{max_lat}N.{lat_increment}N.fesom.{year}.nc"
     if isfile(output_file):
         print(f"Output file already exists, skipping: {output_file}")
         continue
