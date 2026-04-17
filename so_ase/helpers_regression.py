@@ -67,16 +67,17 @@ def regression2D_fesom(src_path, mesh_diag_path, years=(2011, 2024), box=[-180, 
 
     if log:
         print('Loading files...')
-        if depth is not None:
-            print(f'Chosen depth level: {depth}m')
-            ds = xr.open_mfdataset(files2open, decode_times=time_coder).isel(nod2=inds).sel(nz1=depth, method='nearest').squeeze().load()
-        else:        
-            ds = xr.open_mfdataset(files2open, decode_times=time_coder).isel(nod2=inds).load()
+    if depth is not None:
+        print(f'Chosen depth level: {depth}m')
+        ds = xr.open_mfdataset(files2open, decode_times=time_coder).isel(nod2=inds).sel(nz1=depth, method='nearest').squeeze().load()
+    else:        
+        ds = xr.open_mfdataset(files2open, decode_times=time_coder).isel(nod2=inds).load()
     if log:
         for f in files2open:
             print(f'Files loaded: {f}')
     
     ds = ds.transpose('time','nod2')
+    print(ds.time.values[0],ds.time.values[-1])
     
     freq, how = grouping.split('.')
     if freq == 'annual':
@@ -117,7 +118,7 @@ def regression2D_fesom(src_path, mesh_diag_path, years=(2011, 2024), box=[-180, 
         intercept_stderr.append(reg.intercept_stderr)
 
     if grid_data:
-        mesh_diag = xr.open_dataset(f'{src_path}fesom.mesh.diag.nc')
+        mesh_diag = xr.open_dataset(f'{mesh_diag_path}fesom.mesh.diag.nc')
         points = np.column_stack((mesh_diag.lon.values[inds], mesh_diag.lat.values[inds]))
         
         # Define target regular grid
@@ -226,7 +227,7 @@ def regression2D_hadlsst(src_path, years=(2011, 2024), box=[-180, 180, -65, -55]
 
     if log:
         print('Loading files...')
-        ds = xr.open_mfdataset(files2open).sel(longitude=slice(box[0], box[1]), latitude=slice(box[2], box[3])).load()
+    ds = xr.open_mfdataset(files2open).sel(longitude=slice(box[0], box[1]), latitude=slice(box[2], box[3])).load()
     if log:
         for f in files2open:
             print(f'Files loaded: {f}')
@@ -364,13 +365,14 @@ def regression2D_nsidc(src_path, years=(2011, 2024), box=[-180, 180, -65, -55], 
 
     if log:
         print('Loading files...')
-        ds = xr.open_mfdataset(files2open)#.sel(longitude=slice(box[0], box[1]), latitude=slice(box[2], box[3])).load()
+    ds = xr.open_mfdataset(files2open)#.sel(longitude=slice(box[0], box[1]), latitude=slice(box[2], box[3])).load()
     if log:
         for f in files2open:
             print(f'Files loaded: {f}')
 
     ds = reproject_to_latlon(ds)
     #ds = ds.transpose('time','longitude', 'latitude', 'nv')
+    print(ds.time.values[0],ds.time.values[-1])
     
     freq, how = grouping.split('.')
     if freq == 'annual':
