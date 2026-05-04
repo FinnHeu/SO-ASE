@@ -82,16 +82,15 @@ import sys
 path_mesh_src = "/work/ab0995/a270186/model_inputs/fesom2/mesh/DARS2/"
 path_mesh_tgt = "/work/ab0995/a270186/model_inputs/fesom2/mesh/DARS2cav/"
 
-# Restart files on DARS2 mesh (@Mukulika: Replace with nmost recent restarts)
+# Restart files on DARS2 mesh which are supposed to be used on DARS2cav mesh
 path_restart_src_oce = f"/work/bb1469/a270089/runtime/awiesm3-v3.4.1/AWI-ESM3-VEG-HR-CMIP7-Spinup_cont1/restart/fesom/fesom.1475.oce.restart/"
 path_restart_src_ice = f"/work/bb1469/a270089/runtime/awiesm3-v3.4.1/AWI-ESM3-VEG-HR-CMIP7-Spinup_cont1/restart/fesom/fesom.1475.ice.restart/"
 
-# Restart files on DARS2_mod_blacksea mesh (templates)
-# /work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/
+# Restart files on DARS2cav mesh (template files of which the file structure is taken)
 path_restart_tgt_oce = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/DARS2cav/v2.7.1/fesom.1850.oce.restart/"
 path_restart_tgt_ice = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/DARS2cav/v2.7.1/fesom.1850.ice.restart/"
 
-# Restart Destination (@Mukulika: Replace e.g. with year of the latest restarts or whatever year - 1 of the branchoff simulation and destination path)
+# Restart Destination (destination of the generated restart files)
 restart_year = 1475
 path_dst_restarts_oce = f"/work/ba1550/a270186/simulations/awicm3-develop/restarts_DARS2_to_DARS2_mod_blacksea/fesom.{restart_year}.oce.restart/"
 path_dst_restarts_ice = f"/work/ba1550/a270186/simulations/awicm3-develop/restarts_DARS2_to_DARS2_mod_blacksea/fesom.{restart_year}.ice.restart/"
@@ -104,7 +103,11 @@ path_dst_plots = "./plots/"
 is_coupled = True
 
 # Path to restart files on target mesh ( ---> fesom v2.7 <---  ) for masking cavities
-path_restart_tgt_oce_v27 = path_restart_tgt_oce #f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/DARS2cav/v2.7.1/fesom.1850.oce.restart/"
+path_restart_tgt_oce_v27 = path_restart_tgt_oce
+
+# Fill cavities (temp, salt) from existing restart files
+fill_cavities = False
+path_restart_cavity_fill_oce = ""
 
 # =============================================================================
 # ============================ SET LOG FILES ==================================
@@ -189,6 +192,30 @@ def build_spherical_nn_mapper(lon_source, lat_source,
     return indices, distances
 
 def interpolate_extrapolate_2D(varname, path_restart_src, path_restart_tgt, mapper_nodes, path_out, mask_file, mask_file_varname, t_step=-1, verbose=True):
+    """
+    Interpolate/extrapolate 2D variables from source to target grid.
+    
+    Parameters
+    ----------
+    varname : str
+        Name of the variable to interpolate/extrapolate.
+    path_restart_src : str
+        Path to the source restart file.
+    path_restart_tgt : str
+        Path to the target restart file.
+    mapper_nodes : callable
+        Function to map source grid to target grid.
+    path_out : str
+        Path to the output file.
+    mask_file : str
+        Path to the mask file.
+    mask_file_varname : str
+        Name of the variable in the mask file.
+    t_step : int, optional
+        Time step to use, by default -1 (last time step).
+    verbose : bool, optional
+        Whether to print verbose output, by default True
+    """
     
     if verbose:
         print('============ interpolate_extrapolate_node2D.py ==============')
@@ -243,7 +270,26 @@ def interpolate_extrapolate_2D(varname, path_restart_src, path_restart_tgt, mapp
     return
 
 def interpolate_extrapolate_3D(varname, path_restart_src, path_restart_tgt, mapper_nodes, path_out, t_step=-1, verbose=True):
+    """
+    Interpolate/extrapolate 3D variables from source to target grid.
     
+    Parameters
+    ----------
+    varname : str
+        Name of the variable to interpolate/extrapolate.
+    path_restart_src : str
+        Path to the source restart file.
+    path_restart_tgt : str
+        Path to the target restart file.
+    mapper_nodes : callable
+        Function to map source grid to target grid.
+    path_out : str
+        Path to the output file.
+    t_step : int, optional
+        Time step to use, by default -1 (last time step).
+    verbose : bool, optional
+        Whether to print verbose output, by default True
+    """
     if verbose:
         print('============ interpolate_extrapolate_node3D.py ==============')
         print(f'Inter/Extrapolating restart file:')
@@ -375,8 +421,72 @@ def interpolate_extrapolate_3D(varname, path_restart_src, path_restart_tgt, mapp
     print(' ')
     return
 
-def plot_mapper(mapper, lon_src, lat_src, lon_tgt, lat_tgt, horiz, path_dst_plots, n=10000):
+def fill_cavities_from_existing_restart(varname, path_restart_tgt_oce, path_restart_cavity_fill_oce):
+    """ 
+    Replace the cavity values in the destination restart files with the values from the source restart files.
+
+    Parameters
+    ----------
+    varname : str
+        Name of the variable to fill.
+    path_restart_tgt_oce : str
+        Path to the target restart file.
+    path_restart_cavity_fill_oce : str
+        Path to the source restart file.
+    """
+
+    if verbose:
+        print('============ fill_cavities_from_existing_restart.py ==============')
+        print(f'Filling cavity values from existing restart file:')
+        print(f'Source: {path_restart_cavity_fill_oce}{varname}.nc')
+        print(f'Target: {path_restart_tgt_oce}{varname}.nc')
+        print(f'Variable name: {varname}.nc')
     
+    # Rename the originally computed restart file
+    os.rename(f"{path_restart_tgt_oce}{varname}.nc", f"{path_restart_tgt_oce}{varname}_original.nc")
+    
+    # Load the dataset to be filled (just created)
+    ds_to_fill = xr.open_dataset(f"{path_restart_tgt_oce}{varname}_original.nc").isel(time=-1).squeeze()
+
+    # Load the dataset to fill from (another simulation)
+    ds_fill = xr.open_dataset(f"{path_restart_cavity_fill_oce}{varname}.nc").isel(time=-1).squeeze()
+
+    # Build a horizontal cavity mask by checking if the first layer is finite
+    cavity_mask = np.isfinite(ds_to_fill[varname].values[0,:])
+    print(f'Number of cavity cells: {cavity_mask.sum()}')
+
+    # Replace the cavity values with the values from the fill dataset
+    ds_to_fill[varname].values[:, cavity_mask] = ds_fill[varname].values[:, cavity_mask]
+
+    # Save the filled dataset
+    ds_to_fill.to_netcdf(f"{path_restart_tgt_oce}{varname}.nc")
+    
+    
+    
+
+def plot_mapper(mapper, lon_src, lat_src, lon_tgt, lat_tgt, horiz, path_dst_plots, n=10000):
+    """
+    Plot the mapper.
+    
+    Parameters
+    ----------
+    mapper : np.ndarray
+        Mapper array.
+    lon_src : np.ndarray
+        Source longitudes.
+    lat_src : np.ndarray
+        Source latitudes.
+    lon_tgt : np.ndarray
+        Target longitudes.
+    lat_tgt : np.ndarray
+        Target latitudes.
+    horiz : str
+        Horizontal grid type.
+    path_dst_plots : str
+        Path to the plots directory.
+    n : int, optional
+        Number of points to plot, by default 10000
+    """
     fig, ax = plt.subplots(1,1, figsize=(40,20), subplot_kw=dict(projection=ccrs.PlateCarree()))
 
     box = [-180, 180, -90, 90]
@@ -405,7 +515,34 @@ def plot_mapper(mapper, lon_src, lat_src, lon_tgt, lat_tgt, horiz, path_dst_plot
     plt.close()
 
 def plot_interpolated_extrapolated_field(path_src, path_int, path_restart_tgt, varname, lon_src, lat_src, lon_int, lat_int, path_dst_plots, n=20, level=15):
+    """
+    Plot the comparison of source and interpolated/extrapolated field.
     
+    Parameters
+    ----------
+    path_src : str
+        Path to the source directory.
+    path_int : str
+        Path to the interpolated directory.
+    path_restart_tgt : str
+        Path to the target restart directory.
+    varname : str
+        Name of the variable to plot.
+    lon_src : np.ndarray
+        Source longitudes.
+    lat_src : np.ndarray
+        Source latitudes.
+    lon_int : np.ndarray
+        Interpolated longitudes.
+    lat_int : np.ndarray
+        Interpolated latitudes.
+    path_dst_plots : str
+        Path to the plots directory.
+    n : int, optional
+        Number of points to plot, by default 20
+    level : int, optional
+        Level to plot, by default 15
+    """
     print(f"Plotting comparison of source and interpolated/extrapolated field for variable: {varname}")
     print(' ')
 
@@ -535,6 +672,14 @@ if __name__ == "__main__":
         if plot:
             plot_interpolated_extrapolated_field(path_restart_src_oce, path_dst_restarts_oce, path_restart_tgt_oce, varname, elem_lon_src, elem_lat_src, elem_lon_tgt, elem_lat_tgt, path_dst_plots)
 
-print('=============================================================================')
-print('======================== EXTRAPOLATION COMPLETE ============================')
-print('=============================================================================')
+    # =============================================================================
+    # ============== Fill cavities from existing restart files  ===================
+    # =============================================================================
+    if fill_cavities:
+        varnames_3D = ['salt', 'temp', 'temp_AB', 'salt_AB', 'temp_M1', 'salt_M1', 'w', 'w_impl', 'w_expl', 'u', 'v', 'vrhs_AB', 'urhs_AB', 'urhs_AB3', 'vrhs_AB3']
+        for varname in varnames_3D:
+            fill_cavities_from_existing_restart(varname, path_restart_tgt_oce, path_restart_cavity_fill_oce)
+
+    print('=============================================================================')
+    print('======================== EXTRAPOLATION COMPLETE ============================')
+    print('=============================================================================')
