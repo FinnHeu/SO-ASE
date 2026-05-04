@@ -82,18 +82,19 @@ import sys
 path_mesh_src = "/work/ab0995/a270186/model_inputs/fesom2/mesh/DARS2/"
 path_mesh_tgt = "/work/ab0995/a270186/model_inputs/fesom2/mesh/DARS2cav/"
 
-# Restart files on DARS2 mesh
-path_restart_src_oce = f"/work/bb1469/a270089/runtime/awiesm3-v3.4.1/AWI-ESM3-VEG-HR-CMIP7-Spinup_cont1/restart/fesom/fesom.1399.oce.restart/"
-path_restart_src_ice = f"/work/bb1469/a270089/runtime/awiesm3-v3.4.1/AWI-ESM3-VEG-HR-CMIP7-Spinup_cont1/restart/fesom/fesom.1399.ice.restart/"
+# Restart files on DARS2 mesh (@Mukulika: Replace with nmost recent restarts)
+path_restart_src_oce = f"/work/bb1469/a270089/runtime/awiesm3-v3.4.1/AWI-ESM3-VEG-HR-CMIP7-Spinup_cont1/restart/fesom/fesom.1475.oce.restart/"
+path_restart_src_ice = f"/work/bb1469/a270089/runtime/awiesm3-v3.4.1/AWI-ESM3-VEG-HR-CMIP7-Spinup_cont1/restart/fesom/fesom.1475.ice.restart/"
 
-# Restart files on DARS2cav mesh (templates)
+# Restart files on DARS2_mod_blacksea mesh (templates)
+# /work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/
 path_restart_tgt_oce = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/DARS2cav/v2.7.1/fesom.1850.oce.restart/"
 path_restart_tgt_ice = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/DARS2cav/v2.7.1/fesom.1850.ice.restart/"
 
-# Restart Destination
-restart_year = 1849
-path_dst_restarts_oce = f"/work/ba1550/a270186/simulations/awicm3-develop/restarts_DARS2_to_DARS2cav/fesom.{restart_year}.oce.restart/"
-path_dst_restarts_ice = f"/work/ba1550/a270186/simulations/awicm3-develop/restarts_DARS2_to_DARS2cav/fesom.{restart_year}.ice.restart/"
+# Restart Destination (@Mukulika: Replace e.g. with year of the latest restarts or whatever year - 1 of the branchoff simulation and destination path)
+restart_year = 1475
+path_dst_restarts_oce = f"/work/ba1550/a270186/simulations/awicm3-develop/restarts_DARS2_to_DARS2_mod_blacksea/fesom.{restart_year}.oce.restart/"
+path_dst_restarts_ice = f"/work/ba1550/a270186/simulations/awicm3-develop/restarts_DARS2_to_DARS2_mod_blacksea/fesom.{restart_year}.ice.restart/"
 
 # Plots Destination
 plot = True
@@ -103,7 +104,7 @@ path_dst_plots = "./plots/"
 is_coupled = True
 
 # Path to restart files on target mesh ( ---> fesom v2.7 <---  ) for masking cavities
-path_restart_tgt_oce_v27 = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/DARS2cav/v2.7.1/fesom.1850.oce.restart/"
+path_restart_tgt_oce_v27 = path_restart_tgt_oce #f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/DARS2cav/v2.7.1/fesom.1850.oce.restart/"
 
 # =============================================================================
 # ============================ SET LOG FILES ==================================
@@ -311,7 +312,7 @@ def interpolate_extrapolate_3D(varname, path_restart_src, path_restart_tgt, mapp
         data_int_filled[data_dst == 0] = 0
 
         ###---> For velocity variables, set in-cavity values to 0 to force cold start
-        if varname in ['u', 'v', 'urhs_AB', 'vrhs_AB', 'w', 'w_impl', 'w_expl']:
+        if varname in ['u', 'v', 'urhs_AB', 'vrhs_AB', 'urhs_AB3', 'vrhs_AB3', 'w', 'w_impl', 'w_expl']:
             print('Setting cavity velocities to 0 to force cavity cold start.')
 
             np.where(data_dst[0,:]) == 0
@@ -356,7 +357,7 @@ def interpolate_extrapolate_3D(varname, path_restart_src, path_restart_tgt, mapp
         ds_int.attrs['target restart (grid)'] = f'{path_restart_src}{varname}.nc'
 
         ###---> Final checks
-        if varname not in ['u', 'v', 'urhs_AB', 'vrhs_AB', 'w', 'w_impl', 'w_expl']:
+        if varname not in ['u', 'v', 'urhs_AB', 'vrhs_AB', 'urhs_AB3', 'vrhs_AB3', 'w', 'w_impl', 'w_expl']:
             finite_sum = np.isfinite(ds_int[varname].values).sum()
             nansum = np.isnan(ds_int[varname].values).sum()
             zerosum = (ds_int[varname].values == 0).sum()
@@ -374,7 +375,7 @@ def interpolate_extrapolate_3D(varname, path_restart_src, path_restart_tgt, mapp
     print(' ')
     return
 
-def plot_mapper(mapper, lon_src, lat_src, lon_tgt, lat_tgt, horiz, path_dst_plots, n=100):
+def plot_mapper(mapper, lon_src, lat_src, lon_tgt, lat_tgt, horiz, path_dst_plots, n=10000):
     
     fig, ax = plt.subplots(1,1, figsize=(40,20), subplot_kw=dict(projection=ccrs.PlateCarree()))
 
@@ -528,7 +529,7 @@ if __name__ == "__main__":
             plot_interpolated_extrapolated_field(path_restart_src_oce, path_dst_restarts_oce, path_restart_tgt_oce, varname, node_lon_src, node_lat_src, node_lon_tgt, node_lat_tgt, path_dst_plots)
 
 
-    varnames_3D_element = ['u', 'v', 'vrhs_AB', 'urhs_AB']
+    varnames_3D_element = ['u', 'v', 'vrhs_AB', 'urhs_AB', 'urhs_AB3', 'vrhs_AB3']
     for varname in varnames_3D_element:
         interpolate_extrapolate_3D(varname, path_restart_src_oce, path_restart_tgt_oce, mapper_elements, path_dst_restarts_oce, t_step=-1, verbose=True)
         if plot:
