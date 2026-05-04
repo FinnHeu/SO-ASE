@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document>
+	<name>Ross.kml</name>
+	<Style id="inline">
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>2</width>
+		</LineStyle>
+		<PolyStyle>
+			<fill>0</fill>
+		</PolyStyle>
+	</Style>
+	<StyleMap id="inline0">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#inline</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#inline1</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Style id="inline1">
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>2</width>
+		</LineStyle>
+		<PolyStyle>
+			<fill>0</fill>
+		</PolyStyle>
+	</Style>
+	<Placemark>
+		<name>path</name>
+		<styleUrl>#inline0</styleUrl>
+		<LineString>
+			<tessellate>1</tessellate>
+			<coordinates>
+				152.8336825857048,-77.91395820131332,0 145.5295835924145,-81.44195152518918,0 153.0147591372726,-86.71560432538163,0 246.6387921343228,-87.67501682560105,0 259.2469503641471,-84.51069197995523,0 248.7877532180864,-82.42951741652521,0 228.9927043018415,-80.4402195179359,0 211.2144162884917,-78.94857487822961,0 202.9378035994381,-77.66458978104622,0 198.2888428235635,-76.96837627739083,0 172.6766026361643,-76.5714895096188,0 154.5431693927674,-77.60282781706664,0 
+			</coordinates>
+		</LineString>
+		<atom:link rel="app" href="https://www.google.com/earth/about/versions/#earth-pro" title="Google Earth Pro 7.3.6.10441"></atom:link>
+	</Placemark>
+</Document>
+</kml>

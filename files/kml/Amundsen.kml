@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document>
+	<name>AmundsenSea.kml</name>
+	<Style id="inline">
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>2</width>
+		</LineStyle>
+		<PolyStyle>
+			<fill>0</fill>
+		</PolyStyle>
+	</Style>
+	<Style id="inline0">
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>2</width>
+		</LineStyle>
+		<PolyStyle>
+			<fill>0</fill>
+		</PolyStyle>
+	</Style>
+	<StyleMap id="inline1">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#inline</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#inline0</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Placemark>
+		<name>path</name>
+		<styleUrl>#inline1</styleUrl>
+		<LineString>
+			<tessellate>1</tessellate>
+			<coordinates>
+				-63.0828548384526,-65.62512516669574,0 -61.76114550279451,-64.82973299805556,0 -59.84571807294158,-64.09019775147948,0 -57.55599040970214,-63.42330061327048,0 -56.2189212542638,-62.58355677759434,0 -57.91649308979819,-60.83021142112139,0 -64.86971214530234,-62.34412509990154,0 -71.41793501924256,-64.87186030524065,0 -77.49442600081798,-67.4474143426695,0 -85.26954888412892,-68.93050017359205,0 -93.96903381963244,-69.34739851031799,0 -99.73846447254839,-69.84727945521685,0 -105.3167309789765,-70.64323044827518,0 -102.7323403462361,-73.15341179252309,0 -93.8598934803169,-73.93794924141696,0 -84.62526901686469,-74.81894720809466,0 -72.06328506328992,-74.78642434614746,0 -65.91145863618597,-73.37167857871685,0 -65.69131919381566,-71.61131768696795,0 -66.22063791741239,-68.92150309134271,0 -65.69624773011125,-66.99870713804093,0 -63.71341834993996,-65.94060042149522,0 
+			</coordinates>
+		</LineString>
+		<atom:link rel="app" href="https://www.google.com/earth/about/versions/#earth-pro" title="Google Earth Pro 7.3.6.10441"></atom:link>
+	</Placemark>
+</Document>
+</kml>

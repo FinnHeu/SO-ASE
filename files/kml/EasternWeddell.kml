@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document>
+	<name>AtlanticAntarctica.kml</name>
+	<Style id="inline">
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>2</width>
+		</LineStyle>
+		<PolyStyle>
+			<fill>0</fill>
+		</PolyStyle>
+	</Style>
+	<StyleMap id="inline0">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#inline1</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#inline</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Style id="inline1">
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>2</width>
+		</LineStyle>
+		<PolyStyle>
+			<fill>0</fill>
+		</PolyStyle>
+	</Style>
+	<Placemark>
+		<name>path</name>
+		<styleUrl>#inline0</styleUrl>
+		<LineString>
+			<tessellate>1</tessellate>
+			<coordinates>
+				-32.48518321848584,-77.06209464249376,0 -35.00671454630321,-76.10183104913243,0 -26.96804062842569,-71.81969753521741,0 -14.26692725971864,-68.70256702817019,0 0.01162944051620096,-66.55732700871692,0 16.18208272842119,-66.47675587058538,0 29.48187676285717,-65.93888539967719,0 40.39405875111905,-64.99083149226304,0 52.97969791994579,-63.69860087969708,0 63.7383998350316,-64.79017486053628,0 68.7475121370511,-65.66348302541643,0 68.14063146592477,-67.77539092937712,0 66.98578753322897,-68.55755916425657,0 58.66443776454306,-69.55566654314291,0 50.07502229208443,-72.29122348079416,0 41.91101236318271,-75.32310555780624,0 20.92612907618384,-75.38619714918046,0 10.50686767508976,-75.57562784361984,0 -10.08975644653251,-77.99137391780104,0 -29.92274823739472,-77.10881596757557,0 
+			</coordinates>
+		</LineString>
+		<atom:link rel="app" href="https://www.google.com/earth/about/versions/#earth-pro" title="Google Earth Pro 7.3.6.10441"></atom:link>
+	</Placemark>
+</Document>
+</kml>

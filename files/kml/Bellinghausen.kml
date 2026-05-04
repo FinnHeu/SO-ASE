@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document>
+	<name>BellinghausenSea.kml</name>
+	<StyleMap id="inline">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#inline0</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#inline1</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Style id="inline0">
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>2</width>
+		</LineStyle>
+		<PolyStyle>
+			<fill>0</fill>
+		</PolyStyle>
+	</Style>
+	<Style id="inline1">
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>2</width>
+		</LineStyle>
+		<PolyStyle>
+			<fill>0</fill>
+		</PolyStyle>
+	</Style>
+	<Placemark>
+		<name>path</name>
+		<styleUrl>#inline</styleUrl>
+		<LineString>
+			<tessellate>1</tessellate>
+			<coordinates>
+				-102.9153169882952,-73.18905097700909,0 -101.4084888375893,-73.37518503042612,0 -98.46258125268722,-73.65692132963686,0 -97.22263103976603,-74.42502316220937,0 -95.98451124021102,-75.64498910556649,0 -99.71317319432232,-76.30327821315139,0 -104.4326241313778,-76.30468013858541,0 -109.1538719384372,-76.41592288793541,0 -115.8650804325492,-76.09737253469882,0 -120.5462167793629,-75.77686516515341,0 -127.2769980457257,-76.22656798541223,0 -136.6463876256733,-77.0647193387624,0 -143.0093790892699,-78.49418332677611,0 -148.9202392361501,-78.66012603569777,0 -155.1805651906692,-77.94981454442404,0 -159.4054815318541,-76.93246970052024,0 -156.6253240639758,-74.88305013872744,0 -144.948602565235,-73.65849293739379,0 -132.4591985413715,-72.31085265251325,0 -118.821128788381,-72.24670779652003,0 -109.4269052443163,-72.68037853530417,0 -104.1094254532525,-73.12451047341078,0 
+			</coordinates>
+		</LineString>
+		<atom:link rel="app" href="https://www.google.com/earth/about/versions/#earth-pro" title="Google Earth Pro 7.3.6.10441"></atom:link>
+	</Placemark>
+</Document>
+</kml>
