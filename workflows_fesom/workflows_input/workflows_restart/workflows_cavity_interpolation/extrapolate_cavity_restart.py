@@ -105,7 +105,7 @@ is_coupled = True
 # Path to restart files on target mesh ( ---> fesom v2.7 <---  ) for masking cavities
 path_restart_tgt_oce_v27 = path_restart_tgt_oce
 
-# Fill cavities (temp, salt) from existing restart files
+# Fill cavities from existing restart files
 fill_cavities = False
 path_restart_cavity_fill_oce = ""
 
@@ -461,9 +461,6 @@ def fill_cavities_from_existing_restart(varname, path_restart_tgt_oce, path_rest
     # Save the filled dataset
     ds_to_fill.to_netcdf(f"{path_restart_tgt_oce}{varname}.nc")
     
-    
-    
-
 def plot_mapper(mapper, lon_src, lat_src, lon_tgt, lat_tgt, horiz, path_dst_plots, n=10000):
     """
     Plot the mapper.
