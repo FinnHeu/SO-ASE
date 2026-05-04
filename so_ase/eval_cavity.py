@@ -46,6 +46,8 @@ def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, mask, yea
         ``subshelf_melt_<mask>.<year>.nc``.
     """
     
+    print("\n--> Compute fesom subshelf freshwaterflux...")
+    
     # load mesh diag
     mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
 
@@ -149,6 +151,7 @@ def fesom_subshelf_heatflux(src_path, mesh_diag_path, mesh_path, mask, years=(19
     None
         The function writes NetCDF files but does not return a value.
     """
+    print("\n--> Compute fesom subshelf heatflux...")
     # load mesh diagnostics
     mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
 
@@ -224,7 +227,9 @@ def freshwaterflux_to_massflux_Gty(src_path, dst_path, rho_fw=1000, log=True):
         If True, print progress messages when opening, skipping, or saving files.
     """
 
-    files2process = np.sort(glob.glob(f"{src_path}*.nc"))
+    print("\n--> Convert freshwaterflux to massflux Gty...")
+
+    files2process = np.sort(glob.glob(f"{src_path}subshelf_melt*.nc"))
     
     # Open files with cftime decoder
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
@@ -295,7 +300,9 @@ def freshwaterflux_to_massflux_Gtm(src_path, dst_path, rho_fw=1000, log=True):
         If True, print progress messages when opening, skipping, or saving files.
     """
 
-    files2process = np.sort(glob.glob(f"{src_path}*.nc"))
+    print("\n--> Convert freshwaterflux to massflux Gtm...")
+
+    files2process = np.sort(glob.glob(f"{src_path}subshelf_melt*.nc"))
     
     # Open files with cftime decoder
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
@@ -338,7 +345,7 @@ def freshwaterflux_to_massflux_Gtm(src_path, dst_path, rho_fw=1000, log=True):
 
     return 
 
-def fesom_subshelf_hydrography(src_path, mesh_diag_path, mesh_path, mask, years=(1979,1980), variable='temp', log=False, savepath='./'):
+def fesom_subshelf_hydrography(src_path, mesh_diag_path, mesh_path, mask, years=(1979,1980), variable='temp', mean=True, log=False, savepath='./'):
     """
     Extract subshelf hydrography fields from FESOM output for a given node mask
     and save the subsetted fields to new NetCDF files.
@@ -371,48 +378,93 @@ def fesom_subshelf_hydrography(src_path, mesh_diag_path, mesh_path, mask, years=
         For example, ``years=(1979, 1980)`` processes only 1979.
     variable : str or list of str, optional
         One or more variable names to extract from the source files.
+    mean : bool, optional
+        If True, compute the horizontal mean of the variable over the mask.
     log : bool, optional
         If True, print progress messages.
     savepath : str, optional
         Directory where the subsetted NetCDF files will be written.
     """
     
-    # Build mask
-    if log:
-        print("Building mask...")
+    print("\n--> Compute fesom subshelf hydrography...")
+
+    # --- Build mask ---
     if isinstance(mask, dict):
         if mask['name'] == 'all':
             node_mask = build_cavity_mask(mesh_path, which='node')
         else:
-            node_mask = build_cavity_regional_mask(mesh_path, mask['kml_path'], name=mask['name'], which='node')
-    elif isinstance(mask, list) or isinstance(mask, np.array):
+            node_mask = build_cavity_regional_mask(
+                mesh_path, mask['kml_path'],
+                name=mask['name'], which='node'
+            )
+        mask_name = mask['name']
+    elif isinstance(mask, (list, np.ndarray)):
         node_mask = mask
+        mask_name = "custom"
     else:
         raise ValueError('Mask type is not supported!')
 
-    if log:
-        print("Loading mesh diag...")
+    # --- Load mesh diag once ---
     mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
-    years_list = list(range(years[0], years[-1]))
 
-    # Open files with cftime decoder
+    # Precompute nodal area (lazy, small)
+    nod_area = mesh_diag.nod_area.max(dim='nz').isel(nod2=node_mask)
+
+    # Use cftime decoder
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
 
     if isinstance(variable, str):
-        variable = [variable]    
-    
+        variable = [variable]
+
     for var in variable:
-        for y in years_list:
-            infile = f"{src_path}{var}.fesom.{y}.nc"
-            outfile = f"{savepath}{var}_{mask['name']}.{y}.nc"
-            if not isfile(outfile):
-                ds = xr.open_dataset(infile, decode_times=time_coder).load().isel(nod2=node_mask)
-                ds['nod_area'] = ds['nod_area'] = ('nod2', mesh_diag.nod_area.max(dim='nz').isel(nod2=node_mask).values)
-                ds.to_netcdf(outfile)
-                if log:
-                    print(f"Saved: {outfile}")
-            else:
-                if log:
-                    print(f"Skipped: {outfile}")
+
+        if log:
+            print(f"Opening all files for {var}...")
+
+        # OPEN ALL FILES AT ONCE
+        ds = xr.open_mfdataset(
+            f"{src_path}{var}.fesom.*.nc",
+            combine='by_coords',
+            parallel=True,
+            decode_times=time_coder,
+            chunks={'time': 12, 'nod2': 50000}
+        )
+
+        # --- subset years ---
+        ds = ds.sel(time=slice(f"{years[0]}", f"{years[-1]-1}"))
+
+        # --- subset nodes early ---
+        ds = ds.isel(nod2=node_mask)
+
+        # --- add weights ---
+        ds['nod_area'] = nod_area
+
+        # --- compute ---
+        if mean:
+            result = ds[var].weighted(ds['nod_area']).mean(dim='nod2')
+        else:
+            result = ds[var]
+
+        # IMPORTANT: force graph creation ONCE (optional but often faster downstream)
+        result = result.chunk({'time': 12})
+
+        # --- split ONLY at write stage ---
+        years_range = np.arange(years[0], years[-1])
+
+        for y in years_range:
+            yearly = result.sel(time=str(y))
+            outfile = f"{savepath}{var}_{mask_name}.{y}.nc"
+
+            if log:
+                print(f"Writing {outfile}...")
+
+            yearly.to_netcdf(
+                outfile,
+                #engine='h5netcdf',
+                #encoding={var: {'zlib': True, 'complevel': 4}}
+            )
+
+            if log:
+                print(f"Saved: {outfile}")
 
     return
