@@ -13,6 +13,8 @@
 # Cavity:
 #   - Temperature and Salinity: nearest neighbor
 #   - Velocity: set to 0 (cold start) in all cavity elements
+#   - If desired, cavities are filled from existing restart files to reduce 
+#     spin-up time and avoid a freshwater shock
 #
 # Open Ocean:
 #   - Temperature, Salinity, Velocity: nearest neighbor
@@ -23,7 +25,7 @@
 # Ocean:
 #
 # 2D node: (time, node)
-#   - ssh.nc          (time, node) [x]
+#   - ssh.nc          (time, node) 
 #   - ssh_rhs_old.nc  (time, node)
 #   - hbar.nc         (time, node)
 #
@@ -33,6 +35,8 @@
 #   - temp.nc     (time, nz_1, node)
 #   - temp_AB.nc  (time, nz_1, node)
 #   - salt_AB.nc  (time, nz_1, node)
+#   - temp_AB3.nc (time, nz_1, node)
+#   - salt_AB3.nc (time, nz_1, node)
 #   - temp_M1.nc  (time, nz_1, node)
 #   - salt_M1.nc  (time, nz_1, node)
 #
