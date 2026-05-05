@@ -7,7 +7,7 @@ from scipy.stats import linregress
 from scipy.interpolate import griddata
 from os.path import isfile
 from os import remove
-from .helpers_mesh import find_nodes_in_box, add_element_volumes, build_cavity_mask
+from .helpers_mesh import find_nodes_in_box, add_element_volumes, build_cavity_mask, build_runoff_basin_mask
 
 # To Do:
 # ocean temperature 50S-65S horizontal mean
@@ -273,106 +273,6 @@ def fesom_total_kinetic_energy(src_path, mesh_diag_path, meshpath, years=(1979, 
 
     return
         
-
-def fesom_total_runoff(src_path, meshpath, basin_mask_file, basins=[66], years=(1979, 2015), which='solid', ori=False, log=False, savepath='./', replace=False):
-    """
-    Calculate total runoff for specified basins from FESOM output files.
-    
-    This function processes FESOM runoff data files, applies basin masks to isolate
-    runoff from specific drainage basins, and saves the total runoff time series
-    for each year as separate NetCDF files.
-    
-    Parameters:
-        src_path (str): Path to directory containing FESOM runoff files.
-        meshpath (str): Path to directory containing FESOM mesh files.
-        basin_mask_file (str): Path to NetCDF file containing basin mask data.
-        basins (list or int): List of basin IDs to include in calculation. Defaults to [66].
-        years (tuple): Tuple of (start_year, end_year) for processing period. Defaults to (1979, 2015).
-        which (str): Type of runoff to process ('solid' or 'liquid'). Defaults to 'solid'.
-        ori (bool): If True, process original runoff files with '_ori' suffix. Defaults to False.
-        log (bool): If True, print progress messages. Defaults to False.
-        savepath (str): Directory path for output files. Defaults to './'.
-        replace (bool): If True, overwrite existing output files. Defaults to False.
-    
-    Returns:
-        None
-    
-    Notes:
-        - Input files follow pattern: runoff_{which}.fesom.{year}.nc or runoff_{which}_ori.fesom.{year}.nc
-        - Output files follow pattern: {which}_runoff_basins_{basin_ids}.{year}.nc
-        - Runoff is calculated as sum over nodes in specified basins, weighted by nodal area
-        - Uses mesh diagnostics from fesom.mesh.diag.nc for nodal area information
-    """
-    # Load mesh diagnostics
-    mesh_diag = xr.open_dataset(f"{meshpath}fesom.mesh.diag.nc")
-
-    # Build basin mask
-    if log:
-        print(f"Read nodal basin mask from: {basin_mask_file}")
-    
-    if not isinstance(basins, list):
-        basins = [basins]
-        
-    basin_mask = xr.open_dataset(basin_mask_file).basin_id
-    node_mask = np.isin(basin_mask, basins)
-
-    # Build list of all input files
-    years_list = list(range(years[0], years[-1]))
-    if ori:
-        files = [f"{src_path}runoff_{which}_ori.fesom.{y}.nc" for y in years_list]
-    else:
-        files = [f"{src_path}runoff_{which}.fesom.{y}.nc" for y in years_list]
-
-    for i, file in enumerate(files):
-
-        if ori:
-            file2save = f"{savepath}{which}_runoff_ori_basins_{"_".join(map(str, basins))}.{years_list[i]}.nc"
-        else:
-            file2save = f"{savepath}{which}_runoff_basins_{"_".join(map(str, basins))}.{years_list[i]}.nc"
-            
-        if not isfile(file2save):
-            time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-            ds_rnf = xr.open_dataset(file, decode_times=time_coder)
-            RNF = (ds_rnf[f"runoff_{which}"] * mesh_diag.nod_area.isel(nz=0)).isel(nod2=node_mask).sum(dim='nod2')
-
-            ds_out = xr.Dataset(
-            {
-                f"runoff_{which}": RNF
-            },
-            coords={
-                "time": RNF.time
-            }
-            )
-    
-            ds_out.to_netcdf(file2save)
-            if log:
-                print(f"Saved: {file2save}")
-        else:
-            if replace:
-                remove(file2save)
-                if log:
-                    print(f"Removed existing: {file2save}")
-                    
-                time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-                ds_rnf = xr.open_dataset(file, decode_times=time_coder)
-                RNF = (ds_rnf[f"runoff_{which}"] * mesh_diag.nod_area.isel(nz=0)).isel(nod2=node_mask).sum(dim='nod2')
-    
-                ds_out = xr.Dataset(
-                {
-                    f"runoff_{which}": RNF
-                },
-                coords={
-                    "time": RNF.time
-                }
-                )
-        
-                ds_out.to_netcdf(file2save)
-                if log:
-                    print(f"Saved: {file2save}")
-            else:
-                if log:
-                    print(f"Skipped: {file2save}")
-    return
     
         
 

@@ -475,56 +475,38 @@ def build_cavity_regional_mask(meshpath, kml_path, name='Filchner-Ronne', which=
 
     return mask_region
 
-def build_runoff_basin_mask(meshpath, runoff_file, which='liquid'):
-    """
-    Assigns FESOM mesh nodes to runoff basins defined in a runoff_maps.nc file.
-    
-    Parameters:
-        meshpath (str): Path to the directory containing mesh files (nod2d.out).
-        runoff_file (str): Path to the runoff_maps.nc file containing basin definitions.
-        which (str): Either 'liquid' (for arrival_point_id) or 'solid' (for calving_point_id).
-    
-    Returns:
-        xarray.Dataset: Dataset containing basin IDs with node coordinates as dimensions.
-                       Variables include 'basin_id' with basin ID for each mesh node.
-                       Nodes not in any basin will have ID 0.
-    """
+def build_runoff_basin_mask(meshpath, runoff_maps_file, which='solid'):
     
     node_lon, node_lat, node_idx, node_coast = read_nodes(meshpath)
-    
-    ds_runoff = xr.open_dataset(runoff_file)
-    
+
+    ds_runoff = xr.open_dataset(runoff_maps_file)
+
     if which == 'liquid':
         basin_var = 'arrival_point_id'
     elif which == 'solid':
         basin_var = 'calving_point_id'
     else:
         raise ValueError("which must be either 'liquid' or 'solid'")
-    
-    basin_data = ds_runoff[basin_var]
+
+    basin_data = ds_runoff[basin_var].values  # <-- load as numpy array
     basin_lon = ds_runoff['lon'].values
     basin_lat = ds_runoff['lat'].values
 
-    node_lon = lon_to_360(node_lon) # basin_lon is defined on 0-360E, node_lon is on -180-180E
-    
-    basin_ids = np.zeros(len(node_lon), dtype=int)
-    
-    for i in range(len(node_lon)):
-        lon_node = node_lon[i]
-        lat_node = node_lat[i]
-        
-        lon_diff = np.abs(basin_lon - lon_node)
-        lat_diff = np.abs(basin_lat - lat_node)
-        
-        lon_idx = np.argmin(lon_diff)
-        lat_idx = np.argmin(lat_diff)
-        
-        basin_id = int(basin_data.isel(lon=lon_idx, lat=lat_idx).values)
-        basin_ids[i] = basin_id
-    
+    node_lon = lon_to_360(node_lon)
+
+    # --- Compute indices vectorized ---
+    # assumes regular grid!
+    dlon = basin_lon[1] - basin_lon[0]
+    dlat = basin_lat[1] - basin_lat[0]
+
+    lon_idx = np.clip(((node_lon - basin_lon[0]) / dlon).round().astype(int), 0, len(basin_lon) - 1)
+    lat_idx = np.clip(((node_lat - basin_lat[0]) / dlat).round().astype(int), 0, len(basin_lat) - 1)
+
+    # --- Vectorized lookup ---
+    basin_ids = basin_data[lat_idx, lon_idx]
+
     ds_runoff.close()
-    
-    # Create xarray dataset with basin IDs
+
     ds_basin = xr.Dataset(
         {
             'basin_id': (['nod2'], basin_ids)
@@ -539,17 +521,10 @@ def build_runoff_basin_mask(meshpath, runoff_file, which='liquid'):
             'description': f'Runoff basin mask for {which} runoff',
             'basin_type': which,
             'mesh_path': meshpath,
-            'runoff_file': runoff_file
+            'runoff_file': runoff_maps_file
         }
     )
-    
-    # Add attributes to basin_id variable
-    ds_basin['basin_id'].attrs = {
-        'long_name': 'Runoff basin identifier',
-        'units': '1',
-        'description': f'Basin ID for {which} runoff. Nodes not in any basin have ID 0.'
-    }
-    
+
     return ds_basin
 
 

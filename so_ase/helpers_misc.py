@@ -15,8 +15,8 @@ def seconds_per_month(years):
 
     Returns
     -------
-    dict
-        {year: [seconds_in_Jan, seconds_in_Feb, ..., seconds_in_Dec]}
+    numpy array
+        Array of seconds in each month
     """
     
     # Accept single year or iterable
