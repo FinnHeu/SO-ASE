@@ -267,11 +267,13 @@ def fesom_ice_volume(
     if log:
         print("All done!", flush=True)
 
-def nsidc_ice_area(src_path,
+def nsidc_ice_diag(src_path,
     years=(1979, 2015),
     box=[-180, 180, -90, -50],
     siconc_threshold=0.15,
     grouping='annual.mean',
+    version=5,
+    diag='area',               
     log=True):
 
     """
@@ -307,13 +309,18 @@ def nsidc_ice_area(src_path,
 
     files2load = [f"{src_path}siconc.{y}.nc" for y in range(years[0], years[1])]
 
+    if version==6:
+        var = 'cdr_seaice_conc_monthly'
+    elif version==5:
+        var= 'siconc'
+
     # Open files with cftime decoder
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
 
     result = []
     for file in files2load:    
     
-        ds = xr.open_dataset(file, decode_times=time_coder)
+        ds = xr.open_dataset(file, decode_times=time_coder).load()
         if log:
             print(f"File loaded: {file}", flush=True)
 
@@ -326,18 +333,25 @@ def nsidc_ice_area(src_path,
             (ds.lon >= box[0]) & (ds.lon <= box[1])
         )
 
-        mask_isice = ds.siconc > siconc_threshold
+        mask_isice = ds[var] > siconc_threshold
     
         gridcell_area = 25000 * 25000 # m^2
-        ice_area = ((ds.siconc * mask_geo * mask_isice) * gridcell_area).sum(dim=('x','y'))
+
+        if diag=='area':
+            ice_area = ((ds[var] * mask_geo * mask_isice) * gridcell_area).sum(dim=('x','y'))
+            name = 'sea_ice_area'
+        elif diag=='extent':
+            ice_area = ((mask_geo * mask_isice) * gridcell_area).sum(dim=('x','y'))
+            name = 'sea_ice_extent'
+        
         ice_area = ice_area.where(ice_area>0,np.nan)
 
         result.append(ice_area)
 
-    result = xr.concat(result, dim='time').rename('sea_ice_area')
+    result = xr.concat(result, dim='time').rename(name)
 
     result.attrs['units'] = 'm^2'
-    result.attrs['long_name'] = 'total sea ice area'
+    result.attrs['long_name'] = f'total {name}'
     result.attrs['bounding box'] = (
         f"Longitude: {box[0]}E to {box[1]}E, Latitude: {box[2]}N to {box[3]}N"
     )
