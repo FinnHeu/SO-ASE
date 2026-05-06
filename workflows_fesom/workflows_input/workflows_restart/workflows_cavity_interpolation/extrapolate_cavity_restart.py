@@ -1,6 +1,8 @@
+""" 
 # =============================================================================
 # DARS2/CORE2 to DARS2cav/CORE2ice: Generate Restarts
 # =============================================================================
+# Author: Finn Heukamp, 2025
 #
 # Here, FESOM2 restarts are taken from a DARS2/CORE2 simulation and extrapolated
 # onto an existing, however empty, DARS2cav/CORE2ice restart.
@@ -59,6 +61,7 @@
 #   - vice.nc
 #
 # =============================================================================
+"""
 
 # =============================================================================
 # ============================== READ MODULES =================================
@@ -71,15 +74,13 @@ import numpy as np
 import so_ase as so
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
-import pyfesom2 as pf
-import cmocean.cm as cmo
 from scipy.spatial import cKDTree
 import os
 import sys
 
 
 # =============================================================================
-# ============================== SET PATHS =================================
+# ============================== USER SETTINGS ================================
 # =============================================================================
 
 # Mesh directories
@@ -87,17 +88,17 @@ path_mesh_src = "/work/ab0995/a270186/model_inputs/fesom2/mesh/DARS2/"
 path_mesh_tgt = "/work/ab0995/a270186/model_inputs/fesom2/mesh/DARS2cav/"
 
 # Restart files on DARS2 mesh which are supposed to be used on DARS2cav mesh
-path_restart_src_oce = f"/work/bb1469/a270089/runtime/awiesm3-v3.4.1/AWI-ESM3-VEG-HR-CMIP7-Spinup_cont1/restart/fesom/fesom.1475.oce.restart/"
-path_restart_src_ice = f"/work/bb1469/a270089/runtime/awiesm3-v3.4.1/AWI-ESM3-VEG-HR-CMIP7-Spinup_cont1/restart/fesom/fesom.1475.ice.restart/"
+path_restart_src_oce = f"/work/bb1469/a270089/runtime/awiesm3-v3.4.1/AWI-ESM3-VEG-HR-CMIP7-Spinup_cont2/restart/fesom/fesom.1599.oce.restart/"
+path_restart_src_ice = f"/work/bb1469/a270089/runtime/awiesm3-v3.4.1/AWI-ESM3-VEG-HR-CMIP7-Spinup_cont2/restart/fesom/fesom.1599.ice.restart/"
 
 # Restart files on DARS2cav mesh (template files of which the file structure is taken)
-path_restart_tgt_oce = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/DARS2cav/v2.7.1/fesom.1850.oce.restart/"
-path_restart_tgt_ice = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/DARS2cav/v2.7.1/fesom.1850.ice.restart/"
+path_restart_tgt_oce = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/DARS2cav/v2.7.1/fesom.oce.restart/"
+path_restart_tgt_ice = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/DARS2cav/v2.7.1/fesom.ice.restart/"
 
-# Restart Destination (destination of the generated restart files)
-restart_year = 1475
-path_dst_restarts_oce = f"/work/ba1550/a270186/simulations/awicm3-develop/restarts_DARS2_to_DARS2_mod_blacksea/fesom.{restart_year}.oce.restart/"
-path_dst_restarts_ice = f"/work/ba1550/a270186/simulations/awicm3-develop/restarts_DARS2_to_DARS2_mod_blacksea/fesom.{restart_year}.ice.restart/"
+# Restart Destination (destination of the generated restart files to be used for the run)
+restart_year = 1599
+path_restart_dst_oce = f"/work/ba1550/a270186/simulations/awiesm3-v3.4.1/restarts/DARS2_to_DARS2cav/CAV/fesom.{restart_year}.oce.restart/"
+path_restart_dst_ice = f"/work/ba1550/a270186/simulations/awiesm3-v3.4.1/restarts/DARS2_to_DARS2cav/CAV/fesom.{restart_year}.ice.restart/"
 
 # Plots Destination
 plot = True
@@ -110,21 +111,21 @@ is_coupled = True
 path_restart_tgt_oce_v27 = path_restart_tgt_oce
 
 # Fill cavities from existing restart files
-fill_cavities = False
-path_restart_cavity_fill_oce = ""
+fill_cavities = True
+path_restart_cavity_fill_oce = "/work/ba1550/a270301/runtime/awiesm3-v3.4.1/branchoff_DARS2cav/restart/fesom/fesom.1611.oce.restart/"
 
 # =============================================================================
 # ============================ SET LOG FILES ==================================
 # =============================================================================
 
 # Create destination directories if they do not exist
-if not os.path.isdir(path_dst_restarts_oce):
-    os.makedirs(path_dst_restarts_oce)
-if not os.path.isdir(path_dst_restarts_ice):
-    os.makedirs(path_dst_restarts_ice)
+if not os.path.isdir(path_restart_dst_oce):
+    os.makedirs(path_restart_dst_oce)
+if not os.path.isdir(path_restart_dst_ice):
+    os.makedirs(path_restart_dst_ice)
 
-# Determine the parent folder of path_dst_restarts_oce
-log_file = os.path.join(os.path.dirname(path_dst_restarts_oce.rstrip('/')), 'extrapolate_cavity_restart.log')
+# Determine the parent folder of path_restart_dst_oce
+log_file = os.path.join(os.path.dirname(path_restart_dst_oce.rstrip('/')), 'extrapolate_cavity_restart.log')
 
 # Tee class to write to both terminal and log file
 class Tee:
@@ -425,7 +426,7 @@ def interpolate_extrapolate_3D(varname, path_restart_src, path_restart_tgt, mapp
     print(' ')
     return
 
-def fill_cavities_from_existing_restart(varname, path_restart_tgt_oce, path_restart_cavity_fill_oce):
+def fill_cavities_from_existing_restart(varname, path_restart_dst_oce, path_restart_cavity_fill_oce, verbose=True):
     """ 
     Replace the cavity values in the destination restart files with the values from the source restart files.
 
@@ -433,37 +434,43 @@ def fill_cavities_from_existing_restart(varname, path_restart_tgt_oce, path_rest
     ----------
     varname : str
         Name of the variable to fill.
-    path_restart_tgt_oce : str
+    path_restart_dst_oce : str
         Path to the target restart file.
     path_restart_cavity_fill_oce : str
         Path to the source restart file.
     """
 
     if verbose:
-        print('============ fill_cavities_from_existing_restart.py ==============')
+        print('\n============ fill_cavities_from_existing_restart.py ==============')
         print(f'Filling cavity values from existing restart file:')
-        print(f'Source: {path_restart_cavity_fill_oce}{varname}.nc')
-        print(f'Target: {path_restart_tgt_oce}{varname}.nc')
+        print(f'Source: {path_restart_dst_oce}{varname}_original.nc')
+        print(f'Cavity fill source: {path_restart_cavity_fill_oce}{varname}.nc')
+        print(f'Target: {path_restart_dst_oce}{varname}.nc')
         print(f'Variable name: {varname}.nc')
     
     # Rename the originally computed restart file
-    os.rename(f"{path_restart_tgt_oce}{varname}.nc", f"{path_restart_tgt_oce}{varname}_original.nc")
+    os.rename(f"{path_restart_dst_oce}{varname}.nc", f"{path_restart_dst_oce}{varname}_original.nc")
     
     # Load the dataset to be filled (just created)
-    ds_to_fill = xr.open_dataset(f"{path_restart_tgt_oce}{varname}_original.nc").isel(time=-1).squeeze()
+    print(f'Loading {path_restart_dst_oce}{varname}_original.nc')
+    ds_to_fill = xr.open_dataset(f"{path_restart_dst_oce}{varname}_original.nc").isel(time=-1).squeeze()
 
     # Load the dataset to fill from (another simulation)
     ds_fill = xr.open_dataset(f"{path_restart_cavity_fill_oce}{varname}.nc").isel(time=-1).squeeze()
 
-    # Build a horizontal cavity mask by checking if the first layer is finite
-    cavity_mask = np.isfinite(ds_to_fill[varname].values[0,:])
-    print(f'Number of cavity cells: {cavity_mask.sum()}')
+    # Build a horizontal cavity mask by checking if the first layer is zero
+    cavity_mask = ds_to_fill[varname].values[0,:] == 0
+    if verbose:
+        print(f'Number of cavity cells before filling: {cavity_mask.sum()}')
 
     # Replace the cavity values with the values from the fill dataset
-    ds_to_fill[varname].values[:, cavity_mask] = ds_fill[varname].values[:, cavity_mask]
+    ds_to_fill[varname] = ds_to_fill[varname].where(~cavity_mask, ds_fill[varname])
+    #ds_to_fill[varname].values[:, cavity_mask] = ds_fill[varname].values[:, cavity_mask]
+    if verbose:
+        print(f'Number of cavity cells after filling: {(ds_to_fill[varname].values[0,:] == 0).sum()}')
 
     # Save the filled dataset
-    ds_to_fill.to_netcdf(f"{path_restart_tgt_oce}{varname}.nc")
+    ds_to_fill.to_netcdf(f"{path_restart_dst_oce}{varname}.nc")
     
 def plot_mapper(mapper, lon_src, lat_src, lon_tgt, lat_tgt, horiz, path_dst_plots, n=10000):
     """
@@ -597,7 +604,6 @@ def plot_interpolated_extrapolated_field(path_src, path_int, path_restart_tgt, v
     filename = f"compare_{varname}.png"
     plt.savefig(f"{path_dst_plots}{filename}", bbox_inches='tight', dpi=300)
     plt.close()
-    
 
 if __name__ == "__main__":
     print('=============================================================================')
@@ -643,18 +649,18 @@ if __name__ == "__main__":
     mask_file = f"{path_restart_tgt_oce_v27}ssh.nc"
 
     for varname in varnames_2D_node:
-        interpolate_extrapolate_2D(varname, path_restart_src_oce, path_restart_tgt_oce, mapper_nodes, path_dst_restarts_oce, mask_file, mask_file_varname='ssh', t_step=-1, verbose=True)
+        interpolate_extrapolate_2D(varname, path_restart_src_oce, path_restart_tgt_oce, mapper_nodes, path_restart_dst_oce, mask_file, mask_file_varname='ssh', t_step=-1, verbose=True)
         if plot:
-            plot_interpolated_extrapolated_field(path_restart_src_oce, path_dst_restarts_oce, path_restart_tgt_oce, varname, node_lon_src, node_lat_src, node_lon_tgt, node_lat_tgt, path_dst_plots)
+            plot_interpolated_extrapolated_field(path_restart_src_oce, path_restart_dst_oce, path_restart_tgt_oce, varname, node_lon_src, node_lat_src, node_lon_tgt, node_lat_tgt, path_dst_plots)
 
     varnames_2D_node = ['area', 'hsnow', 'hice', 'uice', 'vice']
     if is_coupled:
         varnames_2D_node.extend(['ice_temp', 'ice_albedo'])
 
     for varname in varnames_2D_node:
-        interpolate_extrapolate_2D(varname, path_restart_src_ice, path_restart_tgt_ice, mapper_nodes, path_dst_restarts_ice, mask_file, mask_file_varname='ssh', t_step=-1, verbose=True)
+        interpolate_extrapolate_2D(varname, path_restart_src_ice, path_restart_tgt_ice, mapper_nodes, path_restart_dst_ice, mask_file, mask_file_varname='ssh', t_step=-1, verbose=True)
         if plot:
-            plot_interpolated_extrapolated_field(path_restart_src_ice, path_dst_restarts_ice, path_restart_tgt_ice, varname, node_lon_src, node_lat_src, node_lon_tgt, node_lat_tgt, path_dst_plots)
+            plot_interpolated_extrapolated_field(path_restart_src_ice, path_restart_dst_ice, path_restart_tgt_ice, varname, node_lon_src, node_lat_src, node_lon_tgt, node_lat_tgt, path_dst_plots)
 
     # =============================================================================
     # ======================== 3D nodal/elem fiels (time, nz_1/nz, node/elem) =====
@@ -662,16 +668,16 @@ if __name__ == "__main__":
     varnames_3D_node = ['hnode', 'salt', 'temp', 'temp_AB', 'salt_AB', 'temp_M1', 'salt_M1', 'w', 'w_impl', 'w_expl']
 
     for varname in varnames_3D_node:
-        interpolate_extrapolate_3D(varname, path_restart_src_oce, path_restart_tgt_oce, mapper_nodes, path_dst_restarts_oce, t_step=-1, verbose=True)
+        interpolate_extrapolate_3D(varname, path_restart_src_oce, path_restart_tgt_oce, mapper_nodes, path_restart_dst_oce, t_step=-1, verbose=True)
         if plot:
-            plot_interpolated_extrapolated_field(path_restart_src_oce, path_dst_restarts_oce, path_restart_tgt_oce, varname, node_lon_src, node_lat_src, node_lon_tgt, node_lat_tgt, path_dst_plots)
+            plot_interpolated_extrapolated_field(path_restart_src_oce, path_restart_dst_oce, path_restart_tgt_oce, varname, node_lon_src, node_lat_src, node_lon_tgt, node_lat_tgt, path_dst_plots)
 
 
     varnames_3D_element = ['u', 'v', 'vrhs_AB', 'urhs_AB', 'urhs_AB3', 'vrhs_AB3']
     for varname in varnames_3D_element:
-        interpolate_extrapolate_3D(varname, path_restart_src_oce, path_restart_tgt_oce, mapper_elements, path_dst_restarts_oce, t_step=-1, verbose=True)
+        interpolate_extrapolate_3D(varname, path_restart_src_oce, path_restart_tgt_oce, mapper_elements, path_restart_dst_oce, t_step=-1, verbose=True)
         if plot:
-            plot_interpolated_extrapolated_field(path_restart_src_oce, path_dst_restarts_oce, path_restart_tgt_oce, varname, elem_lon_src, elem_lat_src, elem_lon_tgt, elem_lat_tgt, path_dst_plots)
+            plot_interpolated_extrapolated_field(path_restart_src_oce, path_restart_dst_oce, path_restart_tgt_oce, varname, elem_lon_src, elem_lat_src, elem_lon_tgt, elem_lat_tgt, path_dst_plots)
 
     # =============================================================================
     # ============== Fill cavities from existing restart files  ===================
@@ -679,7 +685,7 @@ if __name__ == "__main__":
     if fill_cavities:
         varnames_3D = ['salt', 'temp', 'temp_AB', 'salt_AB', 'temp_M1', 'salt_M1', 'w', 'w_impl', 'w_expl', 'u', 'v', 'vrhs_AB', 'urhs_AB', 'urhs_AB3', 'vrhs_AB3']
         for varname in varnames_3D:
-            fill_cavities_from_existing_restart(varname, path_restart_tgt_oce, path_restart_cavity_fill_oce)
+            fill_cavities_from_existing_restart(varname, path_restart_dst_oce, path_restart_cavity_fill_oce)
 
     print('=============================================================================')
     print('======================== EXTRAPOLATION COMPLETE ============================')
