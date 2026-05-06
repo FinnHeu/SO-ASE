@@ -93,58 +93,64 @@ def fesom_sea_ice_area(
         f"{format_lat(box[2])}_{format_lat(box[3])}"
     )
 
-    for year in range(years[0], years[1]):
 
-        out_file = f"{savepath}/sea_ice_area_{year}_{box_str}.nc"
-
+    in_files = [f"{src_path}a_ice.fesom.{year}.nc" for year in range(years[0], years[1])]
+    out_files = [f"{savepath}/sea_ice_area_{year}_{box_str}.nc" for year in range(years[0], years[1])]
+    files2load = []
+    files2save = []
+    
+    for out_file, in_file in zip(out_files, in_files):
         if os.path.exists(out_file):
             if log:
                 print(f"Skipping existing file: {out_file}", flush=True)
-            continue
+        else:
+            files2load.append(in_file)
+            files2save.append(out_file)
 
-        in_file = f"{src_path}a_ice.fesom.{year}.nc"
-        
-        # Open files with cftime decoder
-        time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-        ds = xr.open_dataset(in_file, decode_times=time_coder)
+    # Open files with cftime decoder
+    time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+    ds = xr.open_mfdataset(files2load, decode_times=time_coder, chunks={"time": 12})
 
-        # Crop datasets
-        ds_cropped = ds.isel(nod2=inds)
-        mesh_diag_cropped = mesh_diag.isel(nod2=inds)
+    # Crop datasets
+    ds_cropped = ds.isel(nod2=inds)
+    mesh_diag_cropped = mesh_diag.isel(nod2=inds)
 
-        # Create sea ice mask
-        ice_mask = ds_cropped.a_ice > siconc_threshold
+    # Create sea ice mask
+    ice_mask = ds_cropped.a_ice > siconc_threshold
 
-        # Compute sea ice area time series
-        sea_ice_area = (
-            ds_cropped.a_ice * ice_mask * mesh_diag_cropped.nod_area.isel(nz=0)
-        ).sum(dim="nod2")
+    # Compute sea ice area time series
+    sea_ice_area = (
+        ds_cropped.a_ice * ice_mask * mesh_diag_cropped.nod_area.isel(nz=0)
+    ).sum(dim="nod2")
 
-        # Create output dataset with full time series
-        ds_out = sea_ice_area.to_dataset(name="sea_ice_area")
+    # Create output dataset with full time series
+    ds_out = sea_ice_area.to_dataset(name="sea_ice_area")
 
-        # Variable metadata
-        ds_out.sea_ice_area.attrs["units"] = "m^2"
-        ds_out.sea_ice_area.attrs["long_name"] = "total sea ice area"
-        ds_out.sea_ice_area.attrs["bounding_box"] = (
-            f"Longitude: {box[0]}E to {box[1]}E, "
-            f"Latitude: {box[2]}N to {box[3]}N"
-        )
+    # Variable metadata
+    ds_out.sea_ice_area.attrs["units"] = "m^2"
+    ds_out.sea_ice_area.attrs["long_name"] = "total sea ice area"
+    ds_out.sea_ice_area.attrs["bounding_box"] = (
+        f"Longitude: {box[0]}E to {box[1]}E, "
+        f"Latitude: {box[2]}N to {box[3]}N"
+    )
 
-        # Global metadata
-        ds_out.attrs["source"] = "FESOM2"
-        ds_out.attrs["siconc_threshold"] = siconc_threshold
+    # Global metadata
+    ds_out.attrs["source"] = "FESOM2"
+    ds_out.attrs["siconc_threshold"] = siconc_threshold
 
-        # Save to disk
-        ds_out.to_netcdf(out_file)
+    # Split the monthly data into chunks for each individual year and save as xarray dataset
+    for name, y in zip(files2save, range(years[0], years[1])):
+        sia_year = ds_out.sel(time=ds_out.time.dt.year == y)
+        sia_year.to_netcdf(name)
 
         if log:
-            print(f"Saved: {out_file}", flush=True)
+            print(f"Saved: {name}", flush=True)
+
 
     if log:
         print("All done!", flush=True)
 
-def fesom_ice_volume(
+def fesom_sea_ice_volume(
     src_path, 
     mesh_diag_path,
     years=(1979, 2015), 
@@ -217,52 +223,58 @@ def fesom_ice_volume(
         f"{format_lat(box[2])}_{format_lat(box[3])}"
     )
 
-    for year in range(years[0], years[1]):
-
-        out_file = f"{savepath}/sea_ice_volume_{year}_{box_str}.nc"
-
+    in_files_aice = [f"{src_path}a_ice.fesom.{year}.nc" for year in range(years[0], years[1])]
+    in_files_mice = [f"{src_path}m_ice.fesom.{year}.nc" for year in range(years[0], years[1])]
+    out_files = [f"{savepath}/sea_ice_volume_{year}_{box_str}.nc" for year in range(years[0], years[1])]
+    files2load = []
+    files2save = []
+    
+    for out_file, in_file_aice, in_file_mice in zip(out_files, in_files_aice, in_files_mice):
         if os.path.exists(out_file):
             if log:
                 print(f"Skipping existing file: {out_file}", flush=True)
-            continue
+        else:
+            files2load.append(in_file_aice)
+            files2load.append(in_file_mice)
+            files2save.append(out_file)
 
-        file_aice = f"{src_path}a_ice.fesom.{year}.nc"
-        file_mice = f"{src_path}m_ice.fesom.{year}.nc"
-            
-        # Load files for sea ice concentration and thickness
-        time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-        ds = xr.open_mfdataset([file_aice, file_mice], decode_times=time_coder)
-        
-        # Crop datasets
-        ds_cropped = ds.isel(nod2=inds)
-        mesh_diag_cropped = mesh_diag.isel(nod2=inds, nz1=0)
-    
-        # Compute total ice volume time series (nodal area * nodal ice height * nodal ice concentration)
-        sea_ice_volume = (
-            mesh_diag_cropped.nod_area
-            * ds_cropped.m_ice
-            * ds_cropped.a_ice
-        ).sum(dim="nod2")
-    
-        # Create output dataset with full time series
-        ds_out = sea_ice_volume.to_dataset(name="sea_ice_volume")
+    # Open files with cftime decoder
+    time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+    ds = xr.open_mfdataset(files2load, decode_times=time_coder, chunks={"time": 12})
 
-        # Variable metadata
-        ds_out.sea_ice_volume.attrs["units"] = "m^3"
-        ds_out.sea_ice_volume.attrs["long_name"] = "total sea ice volume"
-        ds_out.sea_ice_volume.attrs["bounding_box"] = (
-            f"Longitude: {box[0]}E to {box[1]}E, "
-            f"Latitude: {box[2]}N to {box[3]}N"
-        )
+    # Crop datasets
+    ds_cropped = ds.isel(nod2=inds)
+    mesh_diag_cropped = mesh_diag.isel(nod2=inds, nz=0)
 
-        # Global metadata
-        ds_out.attrs["source"] = "FESOM2"
+    # Compute total ice volume time series (nodal area * nodal ice height * nodal ice concentration)
+    sea_ice_volume = (
+        mesh_diag_cropped.nod_area
+        * ds_cropped.m_ice
+        * ds_cropped.a_ice
+    ).sum(dim="nod2")
 
-        # Save to disk
-        ds_out.to_netcdf(out_file)
+    # Create output dataset with full time series
+    ds_out = sea_ice_volume.to_dataset(name="sea_ice_volume")
+
+    # Variable metadata
+    ds_out.sea_ice_volume.attrs["units"] = "m^3"
+    ds_out.sea_ice_volume.attrs["long_name"] = "total sea ice volume"
+    ds_out.sea_ice_volume.attrs["bounding_box"] = (
+        f"Longitude: {box[0]}E to {box[1]}E, "
+        f"Latitude: {box[2]}N to {box[3]}N"
+    )
+
+    # Global metadata
+    ds_out.attrs["source"] = "FESOM2"
+
+    # Split the monthly data into chunks for each individual year and save as xarray dataset
+    for name, y in zip(files2save, range(years[0], years[1])):
+        siv_year = ds_out.sel(time=ds_out.time.dt.year == y)
+        siv_year.to_netcdf(name)
 
         if log:
-            print(f"Saved: {out_file}", flush=True)
+            print(f"Saved: {name}", flush=True)
+
 
     if log:
         print("All done!", flush=True)
@@ -534,53 +546,58 @@ def fesom_sea_ice_extent(
         f"{format_lat(box[2])}_{format_lat(box[3])}"
     )
 
-    for year in range(years[0], years[1]):
-
-        out_file = f"{savepath}/sea_ice_extent_{year}_{box_str}.nc"
-
+    in_files = [f"{src_path}a_ice.fesom.{year}.nc" for year in range(years[0], years[1])]
+    out_files = [f"{savepath}/sea_ice_extent_{year}_{box_str}.nc" for year in range(years[0], years[1])]
+    files2load = []
+    files2save = []
+    
+    for out_file, in_file in zip(out_files, in_files):
         if os.path.exists(out_file):
             if log:
                 print(f"Skipping existing file: {out_file}", flush=True)
-            continue
+        else:
+            files2load.append(in_file)
+            files2save.append(out_file)
 
-        in_file = f"{src_path}a_ice.fesom.{year}.nc"
-        
-        # Open files with cftime decoder
-        time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-        ds = xr.open_dataset(in_file, decode_times=time_coder)
+    # Open files with cftime decoder
+    time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+    ds = xr.open_mfdataset(files2load, decode_times=time_coder, chunks={"time": 12})
 
-        # Crop datasets
-        ds_cropped = ds.isel(nod2=inds)
-        mesh_diag_cropped = mesh_diag.isel(nod2=inds)
+    # Crop datasets
+    ds_cropped = ds.isel(nod2=inds)
+    mesh_diag_cropped = mesh_diag.isel(nod2=inds)
 
-        # Create sea ice mask
-        ice_mask = ds_cropped.a_ice > siconc_threshold
+    # Create sea ice mask
+    ice_mask = ds_cropped.a_ice > siconc_threshold
 
-        # Compute sea ice extent time series
-        sea_ice_extent = (
-            ice_mask * mesh_diag_cropped.nod_area.isel(nz=0)
-        ).sum(dim="nod2")
+    # Compute sea ice extent time series
+    sea_ice_extent = (
+        ice_mask * mesh_diag_cropped.nod_area.isel(nz=0)
+    ).sum(dim="nod2")
 
-        # Create output dataset with full time series
-        ds_out = sea_ice_extent.to_dataset(name="sea_ice_extent")
+    # Create output dataset with full time series
+    ds_out = sea_ice_extent.to_dataset(name="sea_ice_extent")
 
-        # Variable metadata
-        ds_out.sea_ice_extent.attrs["units"] = "m^2"
-        ds_out.sea_ice_extent.attrs["long_name"] = "total sea ice extent"
-        ds_out.sea_ice_extent.attrs["bounding_box"] = (
-            f"Longitude: {box[0]}E to {box[1]}E, "
-            f"Latitude: {box[2]}N to {box[3]}N"
-        )
+    # Variable metadata
+    ds_out.sea_ice_extent.attrs["units"] = "m^2"
+    ds_out.sea_ice_extent.attrs["long_name"] = "total sea ice extent"
+    ds_out.sea_ice_extent.attrs["bounding_box"] = (
+        f"Longitude: {box[0]}E to {box[1]}E, "
+        f"Latitude: {box[2]}N to {box[3]}N"
+    )
 
-        # Global metadata
-        ds_out.attrs["source"] = "FESOM2"
-        ds_out.attrs["siconc_threshold"] = siconc_threshold
+    # Global metadata
+    ds_out.attrs["source"] = "FESOM2"
+    ds_out.attrs["siconc_threshold"] = siconc_threshold
 
-        # Save to disk
-        ds_out.to_netcdf(out_file)
+    # Split the monthly data into chunks for each individual year and save as xarray dataset
+    for name, y in zip(files2save, range(years[0], years[1])):
+        sie_year = ds_out.sel(time=ds_out.time.dt.year == y)
+        sie_year.to_netcdf(name)
 
         if log:
-            print(f"Saved: {out_file}", flush=True)
+            print(f"Saved: {name}", flush=True)
+
 
     if log:
         print("All done!", flush=True)
