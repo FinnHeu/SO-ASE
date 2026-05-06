@@ -106,7 +106,7 @@ def fesom_sea_ice_area(
         
         # Open files with cftime decoder
         time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-        ds = xr.open_dataset(in_file, decode_times=time_coder).load()
+        ds = xr.open_dataset(in_file, decode_times=time_coder)
 
         # Crop datasets
         ds_cropped = ds.isel(nod2=inds)
@@ -231,7 +231,7 @@ def fesom_ice_volume(
             
         # Load files for sea ice concentration and thickness
         time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-        ds = xr.open_mfdataset([file_aice, file_mice], decode_times=time_coder).load()
+        ds = xr.open_mfdataset([file_aice, file_mice], decode_times=time_coder)
         
         # Crop datasets
         ds_cropped = ds.isel(nod2=inds)
@@ -313,7 +313,7 @@ def nsidc_ice_area(src_path,
     result = []
     for file in files2load:    
     
-        ds = xr.open_dataset(file, decode_times=time_coder).load()
+        ds = xr.open_dataset(file, decode_times=time_coder)
         if log:
             print(f"File loaded: {file}", flush=True)
 
@@ -398,7 +398,7 @@ def hadlsst_ice_area(src_path,
     result = []
     for file in files2load:    
     
-        ds = xr.open_dataset(file, decode_times=time_coder).load()
+        ds = xr.open_dataset(file, decode_times=time_coder)
         if log:
             print(f"File loaded: {file}", flush=True)
 
@@ -533,7 +533,7 @@ def fesom_sea_ice_extent(
         
         # Open files with cftime decoder
         time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-        ds = xr.open_dataset(in_file, decode_times=time_coder).load()
+        ds = xr.open_dataset(in_file, decode_times=time_coder)
 
         # Crop datasets
         ds_cropped = ds.isel(nod2=inds)
