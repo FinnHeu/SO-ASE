@@ -1,5 +1,6 @@
 # so_ase.eval_cavity.py
 
+import os
 import xarray as xr
 import numpy as np
 import glob
@@ -48,56 +49,80 @@ def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, mask, yea
     
     print("\n--> Compute fesom subshelf freshwaterflux...")
     
-    # load mesh diag
-    mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
+    os.makedirs(savepath, exist_ok=True)
 
-    # Build mask
-    if isinstance(mask, dict):
-        if mask['name'] == 'all':
-            node_mask = build_cavity_mask(mesh_path, which='node')
-        else:
-            node_mask = build_cavity_regional_mask(mesh_path, mask['kml_path'], name=mask['name'], which='node')
-    elif isinstance(mask, list) or isinstance(mask, np.array):
-        node_mask = mask
-    else:
-        raise ValueError('Mask type is not supported!')
+    
         
-    # Build list of all input files
+    # Build list of all input/output files
     years_list = list(range(years[0], years[-1]))
-    files = [f"{src_path}fw.fesom.{y}.nc" for y in years_list]
+    in_files = [f"{src_path}fw.fesom.{y}.nc" for y in years_list]
+    out_files = [f"{savepath}subshelf_melt_{mask['name']}.{y}.nc" for y in years_list]
+    
+    # Filter: only load files whose output does not exist yet
+    files2load = []
+    files2save = []
+    years2process = []
+    
+    for in_file, out_file, y in zip(in_files, out_files, years_list):
+        if os.path.exists(out_file):
+            if log:
+                print(f"Skipping existing file: {out_file}")
+        else:
+            files2load.append(in_file)
+            files2save.append(out_file)
+            years2process.append(y)
+    
+    if not files2load:
+        if log:
+            print("All files already exist. Nothing to process.")
+            return
+    else:
+        # Build mask
+        mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
+        if isinstance(mask, dict):
+            if mask['name'] == 'all':
+                node_mask = build_cavity_mask(mesh_path, which='node')
+            else:
+                node_mask = build_cavity_regional_mask(mesh_path, mask['kml_path'], name=mask['name'], which='node')
+            mask_name = mask['name']
+        elif isinstance(mask, list) or isinstance(mask, np.array):
+            node_mask = mask
+            mask_name = 'custom'
+        else:
+            raise ValueError('Mask type is not supported!')
 
     # Open files with cftime decoder
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+    ds_fw = xr.open_mfdataset(files2load, decode_times=time_coder, chunks={"time": 12})
 
-    for i, file in enumerate(files):
+    # Compute subshelf melt
+    SSM = (ds_fw.fw * mesh_diag.nod_area.max(dim='nz')).isel(nod2=node_mask).sum(dim='nod2')
 
-        file2save = f"{savepath}subshelf_melt_{mask['name']}.{years_list[i]}.nc"
-        if not isfile(file2save):
-            
-            ds_fw = xr.open_dataset(file, decode_times=time_coder)
-            SSM = (ds_fw.fw * mesh_diag.nod_area.max(dim='nz')).isel(nod2=node_mask).sum(dim='nod2')
+    # Create output dataset
+    ds_out = xr.Dataset(
+        {
+            "subshelf_melt": SSM
+        },
+        coords={
+            "time": SSM.time
+        }
+    )
 
-            ds_out = xr.Dataset(
-            {
-                "subshelf_melt": SSM
-            },
-            coords={
-                "time": SSM.time
-            }
-            )
-    
-            # Add units attribute
-            ds_out["subshelf_melt"].attrs = {
-                "units": "m3/s",
-                "description": "sum(subshelf_melt(i) [m/s] * area(i) [m2]) over cavity region"
-            }
-    
-            ds_out.to_netcdf(file2save)
-            if log:
-                print(f"Saved: {file2save}")
-        else:
-            if log:
-                print(f"Skipped: {file2save}")
+    # Add units attribute
+    ds_out["subshelf_melt"].attrs = {
+        "units": "m3/s",
+        "description": "sum(subshelf_melt(i) [m/s] * area(i) [m2]) over cavity region"
+    }
+
+    # Split into annual chunks and save
+    for out_file, y in zip(files2save, years2process):
+        ds_year = ds_out.sel(time=ds_out.time.dt.year == y)
+        ds_year.to_netcdf(out_file)
+        if log:
+            print(f"Saved: {out_file}")
+
+    if log:
+        print("All done!")
 
     return
 
@@ -152,50 +177,77 @@ def fesom_subshelf_heatflux(src_path, mesh_diag_path, mesh_path, mask, years=(19
         The function writes NetCDF files but does not return a value.
     """
     print("\n--> Compute fesom subshelf heatflux...")
-    # load mesh diagnostics
-    mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
+    
+    os.makedirs(savepath, exist_ok=True)
 
-    # Build mask
-    if isinstance(mask, dict):
-        if mask['name'] == 'all':
-            node_mask = build_cavity_mask(mesh_path, which='node')
-        else:
-            node_mask = build_cavity_regional_mask(mesh_path, mask['kml_path'], name=mask['name'], which='node')
-    elif isinstance(mask, list) or isinstance(mask, np.array):
-        node_mask = mask
-    else:
-        raise ValueError('Mask type is not supported!')
+    
         
-    # Build list of all input files
+    # Build list of all input/output files
     years_list = list(range(years[0], years[-1]))
-    files = [f"{src_path}fh.fesom.{y}.nc" for y in years_list]
+    in_files = [f"{src_path}fh.fesom.{y}.nc" for y in years_list]
+    out_files = [f"{savepath}subshelf_heatflux_{mask['name']}.{y}.nc" for y in years_list]
+    
+    # Filter: only load files whose output does not exist yet
+    files2load = []
+    files2save = []
+    years2process = []
+    
+    for in_file, out_file, y in zip(in_files, out_files, years_list):
+        if os.path.exists(out_file):
+            if log:
+                print(f"Skipping existing file: {out_file}")
+        else:
+            files2load.append(in_file)
+            files2save.append(out_file)
+            years2process.append(y)
+    
+    if not files2load:
+        if log:
+            print("All files already exist. Nothing to process.")
+            return
+    else:
+        # load mesh diagnostics
+        mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
+
+        # Build mask
+        if isinstance(mask, dict):
+            if mask['name'] == 'all':
+                node_mask = build_cavity_mask(mesh_path, which='node')
+            else:
+                node_mask = build_cavity_regional_mask(mesh_path, mask['kml_path'], name=mask['name'], which='node')
+            mask_name = mask['name']
+        elif isinstance(mask, list) or isinstance(mask, np.array):
+            node_mask = mask
+            mask_name = 'custom'
+        else:
+            raise ValueError('Mask type is not supported!')
 
     # Open files with cftime decoder
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+    ds_fh = xr.open_mfdataset(files2load, decode_times=time_coder, chunks={"time": 12})
 
-    for i, file in enumerate(files):
+    # Compute subshelf heatflux
+    SSHF = (ds_fh.fh * mesh_diag.nod_area.max(dim='nz')).isel(nod2=node_mask).sum(dim='nod2')
 
-        file2save = f"{savepath}subshelf_heatflux_{mask['name']}.{years_list[i]}.nc"
-        if not isfile(file2save):
-            
-            ds_fh = xr.open_dataset(file, decode_times=time_coder)
-            SSHF = (ds_fh.fh * mesh_diag.nod_area.max(dim='nz')).isel(nod2=node_mask).sum(dim='nod2')
+    # Create output dataset
+    ds_out = xr.Dataset(
+        {
+            "subshelf_heatflux": SSHF
+        },
+        coords={
+            "time": SSHF.time
+        }
+    )
 
-            ds_out = xr.Dataset(
-            {
-                "subshelf_heatflux": SSHF
-            },
-            coords={
-                "time": SSHF.time
-            }
-            )
-    
-            ds_out.to_netcdf(file2save)
-            if log:
-                print(f"Saved: {file2save}")
-        else:
-            if log:
-                print(f"Skipped: {file2save}")
+    # Split into annual chunks and save
+    for out_file, y in zip(files2save, years2process):
+        ds_year = ds_out.sel(time=ds_out.time.dt.year == y)
+        ds_year.to_netcdf(out_file)
+        if log:
+            print(f"Saved: {out_file}")
+
+    if log:
+        print("All done!")
 
     return
     
