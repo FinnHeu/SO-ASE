@@ -107,6 +107,11 @@ def fesom_sea_ice_area(
             files2load.append(in_file)
             files2save.append(out_file)
 
+    if not files2load:
+        if log:
+            print("No new files to load")
+        return
+        
     # Open files with cftime decoder
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
     ds = xr.open_mfdataset(files2load, decode_times=time_coder, chunks={"time": 12})
@@ -146,9 +151,9 @@ def fesom_sea_ice_area(
         if log:
             print(f"Saved: {name}", flush=True)
 
-
     if log:
         print("All done!", flush=True)
+    return
 
 def fesom_sea_ice_volume(
     src_path, 
@@ -237,6 +242,11 @@ def fesom_sea_ice_volume(
             files2load.append(in_file_aice)
             files2load.append(in_file_mice)
             files2save.append(out_file)
+
+    if not files2load:
+        if log:
+            print("No new files to load")
+        return
 
     # Open files with cftime decoder
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
@@ -558,6 +568,11 @@ def fesom_sea_ice_extent(
         else:
             files2load.append(in_file)
             files2save.append(out_file)
+
+    if not files2load:
+        if log:
+            print("No new files to load")
+        return
 
     # Open files with cftime decoder
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
