@@ -17,7 +17,7 @@ def create_map(
     lon_inc=30,
     lat_inc=5,
     tick_labels=True,
-    circular=True,
+    circular=False,
     zorder=1000,
 ):
     """
@@ -100,8 +100,8 @@ def create_map(
         zorder=zorder + 1,
     )
 
-    gl.xlocator = mticker.FixedLocator(range(-180, 180, lon_inc))
-    gl.ylocator = mticker.FixedLocator(range(-90, 90, lat_inc))
+    gl.xlocator = mticker.FixedLocator(range(-180, 180+lon_inc, lon_inc))
+    gl.ylocator = mticker.FixedLocator(range(-90, 90+lat_inc, lat_inc))
     gl.xformatter = LONGITUDE_FORMATTER
     gl.yformatter = LATITUDE_FORMATTER
     gl.xlabel_style = {"size": 8, "rotation": 0}
