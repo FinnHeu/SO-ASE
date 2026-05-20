@@ -79,6 +79,7 @@ import os
 import sys
 
 
+
 # =============================================================================
 # ============================== USER SETTINGS ================================
 # =============================================================================
@@ -97,8 +98,8 @@ path_restart_tgt_ice = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/
 
 # Restart Destination (destination of the generated restart files to be used for the run)
 restart_year = 1599
-path_restart_dst_oce = f"/work/ba1550/a270186/simulations/awiesm3-v3.4.1/restarts/DARS2_to_DARS2cav/CAV/fesom.{restart_year}.oce.restart/"
-path_restart_dst_ice = f"/work/ba1550/a270186/simulations/awiesm3-v3.4.1/restarts/DARS2_to_DARS2cav/CAV/fesom.{restart_year}.ice.restart/"
+path_restart_dst_oce = f"/work/ba1550/a270186/simulations/awiesm3-v3.4.1/restarts/DARS2_to_DARS2cav/CAVini/fesom.{restart_year}.oce.restart/"
+path_restart_dst_ice = f"/work/ba1550/a270186/simulations/awiesm3-v3.4.1/restarts/DARS2_to_DARS2cav/CAVini/fesom.{restart_year}.ice.restart/"
 
 # Plots Destination
 plot = True
@@ -109,10 +110,6 @@ is_coupled = True
 
 # Path to restart files on target mesh ( ---> fesom v2.7 <---  ) for masking cavities
 path_restart_tgt_oce_v27 = path_restart_tgt_oce
-
-# Fill cavities from existing restart files
-fill_cavities = True
-path_restart_cavity_fill_oce = "/work/ba1550/a270301/runtime/awiesm3-v3.4.1/branchoff_DARS2cav/restart/fesom/fesom.1611.oce.restart/"
 
 # =============================================================================
 # ============================ SET LOG FILES ==================================
@@ -425,52 +422,6 @@ def interpolate_extrapolate_3D(varname, path_restart_src, path_restart_tgt, mapp
 
     print(' ')
     return
-
-def fill_cavities_from_existing_restart(varname, path_restart_dst_oce, path_restart_cavity_fill_oce, verbose=True):
-    """ 
-    Replace the cavity values in the destination restart files with the values from the source restart files.
-
-    Parameters
-    ----------
-    varname : str
-        Name of the variable to fill.
-    path_restart_dst_oce : str
-        Path to the target restart file.
-    path_restart_cavity_fill_oce : str
-        Path to the source restart file.
-    """
-
-    if verbose:
-        print('\n============ fill_cavities_from_existing_restart.py ==============')
-        print(f'Filling cavity values from existing restart file:')
-        print(f'Source: {path_restart_dst_oce}{varname}_original.nc')
-        print(f'Cavity fill source: {path_restart_cavity_fill_oce}{varname}.nc')
-        print(f'Target: {path_restart_dst_oce}{varname}.nc')
-        print(f'Variable name: {varname}.nc')
-    
-    # Rename the originally computed restart file
-    os.rename(f"{path_restart_dst_oce}{varname}.nc", f"{path_restart_dst_oce}{varname}_original.nc")
-    
-    # Load the dataset to be filled (just created)
-    print(f'Loading {path_restart_dst_oce}{varname}_original.nc')
-    ds_to_fill = xr.open_dataset(f"{path_restart_dst_oce}{varname}_original.nc").isel(time=-1).squeeze()
-
-    # Load the dataset to fill from (another simulation)
-    ds_fill = xr.open_dataset(f"{path_restart_cavity_fill_oce}{varname}.nc").isel(time=-1).squeeze()
-
-    # Build a horizontal cavity mask by checking if the first layer is zero
-    cavity_mask = ds_to_fill[varname].values[0,:] == 0
-    if verbose:
-        print(f'Number of cavity cells before filling: {cavity_mask.sum()}')
-
-    # Replace the cavity values with the values from the fill dataset
-    ds_to_fill[varname] = ds_to_fill[varname].where(~cavity_mask, ds_fill[varname])
-    #ds_to_fill[varname].values[:, cavity_mask] = ds_fill[varname].values[:, cavity_mask]
-    if verbose:
-        print(f'Number of cavity cells after filling: {(ds_to_fill[varname].values[0,:] == 0).sum()}')
-
-    # Save the filled dataset
-    ds_to_fill.to_netcdf(f"{path_restart_dst_oce}{varname}.nc")
     
 def plot_mapper(mapper, lon_src, lat_src, lon_tgt, lat_tgt, horiz, path_dst_plots, n=10000):
     """
@@ -679,14 +630,7 @@ if __name__ == "__main__":
         if plot:
             plot_interpolated_extrapolated_field(path_restart_src_oce, path_restart_dst_oce, path_restart_tgt_oce, varname, elem_lon_src, elem_lat_src, elem_lon_tgt, elem_lat_tgt, path_dst_plots)
 
-    # =============================================================================
-    # ============== Fill cavities from existing restart files  ===================
-    # =============================================================================
-    if fill_cavities:
-        varnames_3D = ['salt', 'temp', 'temp_AB', 'salt_AB', 'temp_M1', 'salt_M1', 'w', 'w_impl', 'w_expl', 'u', 'v', 'vrhs_AB', 'urhs_AB', 'urhs_AB3', 'vrhs_AB3']
-        for varname in varnames_3D:
-            fill_cavities_from_existing_restart(varname, path_restart_dst_oce, path_restart_cavity_fill_oce)
-
+    
     print('=============================================================================')
     print('======================== EXTRAPOLATION COMPLETE ============================')
     print('=============================================================================')
