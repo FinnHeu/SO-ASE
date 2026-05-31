@@ -9,7 +9,7 @@ from scipy.spatial import cKDTree
 from pyproj import Proj, Transformer
 from collections import defaultdict, deque
 from scipy.interpolate import griddata
-from .helpers_misc import lon_to_360, read_kml_coords
+from ..miscellaneous.helpers_misc import lon_to_360, read_kml_coords
 
 ###--------> 1. Read raw mesh files
 

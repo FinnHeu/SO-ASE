@@ -25,7 +25,7 @@ def add_notebook_path_to_fig(fig, y_position=-0.05, fontsize=8):
              horizontalalignment='center', fontsize=fontsize)
     
 
-def remove_axes_frame(ax, left=True, right=True, top=True, bottom=True,
+def remove_axes_frame(ax, left=False, right=True, top=True, bottom=False,
                       ticks=True, labels=True):
     """
     Remove or hide selected sides of a matplotlib Axes frame.
