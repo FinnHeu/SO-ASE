@@ -1,0 +1,48 @@
+name: so_ase_mac
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Core Python
+  - python=3.13.5
+  
+  # Data Science Core
+  - numpy
+  - pandas
+  - scipy
+  - xarray
+  - netcdf4
+  
+  # Visualization
+  - matplotlib
+  - cartopy
+  - cmocean
+  
+  # Geospatial
+  - shapely
+  - pyproj
+  
+  # Specialized Ocean Modeling
+  - pyfesom2
+  
+  # Utilities
+  - joblib
+  
+  # Jupyter/IPython
+  - ipython
+  - jupyter
+  - ipykernel
+  - ipynbname
+  
+  # Setuptools (for pkg_resources compatibility)
+  - setuptools=70.0.0
+  
+  # Development tools
+  - pip
+  
+  # Additional dependencies that might be needed
+  - cftime
+  - zarr
+  - dask
+  - cfgrib
+  

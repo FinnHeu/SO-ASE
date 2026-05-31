@@ -10,7 +10,7 @@ import scipy
 from os.path import isdir, isfile
 from os import makedirs
 from scipy.spatial import cKDTree
-from .helpers_misc import lon_lat_to_cartesian
+from ..miscellaneous.helpers_misc import lon_lat_to_cartesian
 
 def create_indexes_and_distances(mesh, lons, lats, k=1):
     """
