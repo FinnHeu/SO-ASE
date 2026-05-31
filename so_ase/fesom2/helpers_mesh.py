@@ -527,6 +527,39 @@ def build_runoff_basin_mask(meshpath, runoff_maps_file, which='solid'):
 
     return ds_basin
 
+def find_calving_front_elements(meshpath):
+    """
+    Finds all ocean elements that have at least one neighboring cavity element.
+    
+    Ocean elements are defined as elements with cavity_elvls == 1.
+    Cavity elements are defined as elements with cavity_elvls > 1.
+    
+    Parameters:
+        meshpath (str): Path to the directory containing mesh files.
+    
+    Returns:
+        array of bool: Boolean mask of length num_elements, True for ocean elements
+                       that have at least one neighboring cavity element.
+    """
+    elements = read_elements(meshpath)
+    node_lon, node_lat, node_idx, _ = read_nodes(meshpath)
+    lev_cav = read_element_levels(meshpath, which='cavity', raw=False, python_indexing=False)
+    
+    is_ocean = lev_cav == 1
+    is_cavity = lev_cav > 1
+    
+    elems_of_node = build_elements_of_nodes(elements, node_idx)
+    
+    ocean_near_cavity = np.zeros(len(elements), dtype=bool)
+    for eidx in range(len(elements)):
+        if is_ocean[eidx]:
+            for node in elements[eidx]:
+                if any(is_cavity[e] for e in elems_of_node[node]):
+                    ocean_near_cavity[eidx] = True
+                    break
+    
+    return ocean_near_cavity
+
 
 ###--------> 4. Compute mesh resolution
 

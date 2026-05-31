@@ -14,6 +14,8 @@ def create_map(
     extent="global",
     land=True,
     coastline=True,
+    landcolor='lightgray',
+    coastcolor='black',
     lon_inc=30,
     lat_inc=5,
     tick_labels=True,
@@ -83,9 +85,9 @@ def create_map(
 
     # add land/coastlines
     if land:
-        ax.add_feature(cfeature.LAND, color="lightgrey", zorder=zorder)
+        ax.add_feature(cfeature.LAND, color=landcolor, zorder=zorder)
     if coastline:
-        ax.add_feature(cfeature.COASTLINE, color="black", linewidth=0.5, zorder=zorder)
+        ax.add_feature(cfeature.COASTLINE, color=coastcolor, linewidth=0.5, zorder=zorder)
 
     # add grid and grid labels
     gl = ax.gridlines(
@@ -135,7 +137,7 @@ def circular_shape(ax):
     ax.set_boundary(circle, transform=ax.transAxes)
     return ax
 
-def plot_on_elements(ax, lon, lat, elements, data, mask, vmin='None', vmax='None', cmap="RdBu", zorder=1):
+def plot_on_elements(ax, lon, lat, elements, data, mask, vmin='None', vmax='None', cmap="RdBu", linewidths=0.5, zorder=1):
     """
     Plots data on a triangular mesh defined by elements.
     
@@ -184,6 +186,7 @@ def plot_on_elements(ax, lon, lat, elements, data, mask, vmin='None', vmax='None
                         vmin=vmin,
                         vmax=vmax,
                         edgecolor='k',
+                        linewidths=linewidths,
                         transform=ccrs.PlateCarree(),
                         zorder=zorder)
 
