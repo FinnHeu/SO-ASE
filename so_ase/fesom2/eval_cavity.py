@@ -6,7 +6,7 @@ import numpy as np
 import glob
 from os.path import isfile
 from .helpers_mesh import build_cavity_mask, build_cavity_regional_mask
-from .helpers_misc import seconds_per_month
+from ..miscellaneous.helpers_misc import seconds_per_month
 
 def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, mask, years=(1979, 2015), log=False, savepath='./'):
     """

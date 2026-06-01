@@ -1,7 +1,7 @@
 # so_ase.eval_calving.py
 
 import xarray as xr
-from so_ase.helpers_misc import seconds_per_month
+from ..miscellaneous.helpers_misc import seconds_per_month
 from .helpers_mesh import build_runoff_basin_mask
 
 def fesom_calving_flux(src_path, meshpath, mesh_diag_path, runoff_maps, basin=66, which='runoff_solid', years=(1979, 2015), log=False, savepath='./'):
