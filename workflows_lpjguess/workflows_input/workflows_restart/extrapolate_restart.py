@@ -44,7 +44,7 @@ source_dir = '/work/bb1469/a270089/runtime/awiesm3-v3.4.2/AWI-ESM3-VEG-HR-CMIP7-
 template_dir = '/work/ba1550/a270186/simulations/awiesm3-v3.4.1-CAV-ICB/preproduction/CAV-ICB-PICTRL-TEST-with_icb-7/restart/lpj_guess/lpjg_state_1608'
 
 # Output directory for converted restart files
-output_dir = '/work/ba1550/a270186/simulations/awiesm3-v3.4.2-CAV-ICB/preproduction/TCO319L137-DARS2cav-Branchoff-TEST-1/run_18500101-18501231/lpjguess_restart/lpjg_state_template_first'
+output_dir = '/home/a/a270186/python_modules/SO-ASE/test/'
 
 # =============================================================================
 # ============================ SET LOG FILES ==================================
