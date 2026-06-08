@@ -561,6 +561,47 @@ def find_calving_front_elements(meshpath):
     return ocean_near_cavity
 
 
+def find_first_inside_cavity_elements(meshpath):
+    """
+    Finds all cavity elements that are neighbors of the calving front elements.
+    
+    These are the first row of elements inside the cavity, i.e., cavity elements
+    that share one or more nodes with the first row of ocean elements (calving front).
+    
+    Parameters:
+        meshpath (str): Path to the directory containing mesh files.
+    
+    Returns:
+        array of bool: Boolean mask of length num_elements, True for cavity elements
+                       that are neighbors of calving front elements.
+    """
+    elements = read_elements(meshpath)
+    node_lon, node_lat, node_idx, _ = read_nodes(meshpath)
+    lev_cav = read_element_levels(meshpath, which='cavity', raw=False, python_indexing=False)
+    
+    # Get calving front elements (first row of ocean elements)
+    calving_front_mask = find_calving_front_elements(meshpath)
+    
+    # Identify cavity elements
+    is_cavity = lev_cav > 1
+    
+    # Build elements of nodes mapping
+    elems_of_node = build_elements_of_nodes(elements, node_idx)
+    
+    # Find cavity elements that share nodes with calving front elements
+    first_inside_cavity = np.zeros(len(elements), dtype=bool)
+    
+    for eidx in range(len(elements)):
+        if calving_front_mask[eidx]:  # This is a calving front element
+            for node in elements[eidx]:
+                # Find all neighboring elements that share this node
+                for neighbor_elem in elems_of_node[node]:
+                    if is_cavity[neighbor_elem]:  # Neighbor is a cavity element
+                        first_inside_cavity[neighbor_elem] = True
+    
+    return first_inside_cavity
+
+
 ###--------> 4. Compute mesh resolution
 
 def compute_mesh_resolution(meshpath, R=6371000.0, interpolate2regular=False):
