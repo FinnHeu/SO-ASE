@@ -4,6 +4,7 @@ import xarray as xr
 import numpy as np
 import shapely.geometry as sh
 import math
+import os
 
 from scipy.spatial import cKDTree
 from pyproj import Proj, Transformer
@@ -568,6 +569,8 @@ def find_first_inside_cavity_elements(meshpath):
     These are the first row of elements inside the cavity, i.e., cavity elements
     that share one or more nodes with the first row of ocean elements (calving front).
     
+    Results are cached to elem_first_inside_cavity.npz for faster subsequent access.
+    
     Parameters:
         meshpath (str): Path to the directory containing mesh files.
     
@@ -575,6 +578,16 @@ def find_first_inside_cavity_elements(meshpath):
         array of bool: Boolean mask of length num_elements, True for cavity elements
                        that are neighbors of calving front elements.
     """
+    
+    # Check if cached file exists
+    cache_file = os.path.join(meshpath, 'elem_first_inside_cavity.npz')
+    if os.path.exists(cache_file):
+        print(f"Loading first inside cavity elements from cache: {cache_file}")
+        # Load from cache
+        cached_data = np.load(cache_file)
+        return cached_data['first_inside_cavity']
+    
+    # Compute if not cached
     elements = read_elements(meshpath)
     node_lon, node_lat, node_idx, _ = read_nodes(meshpath)
     lev_cav = read_element_levels(meshpath, which='cavity', raw=False, python_indexing=False)
@@ -598,6 +611,10 @@ def find_first_inside_cavity_elements(meshpath):
                 for neighbor_elem in elems_of_node[node]:
                     if is_cavity[neighbor_elem]:  # Neighbor is a cavity element
                         first_inside_cavity[neighbor_elem] = True
+    
+    # Save to cache
+    np.savez_compressed(cache_file, first_inside_cavity=first_inside_cavity)
+    print(f"Saved first inside cavity elements to cache: {cache_file}")
     
     return first_inside_cavity
 
