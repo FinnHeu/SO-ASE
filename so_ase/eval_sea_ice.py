@@ -8,6 +8,7 @@ from .helpers_mesh import find_nodes_in_box, gridcell_area_hadley, reproject_to_
 import os
 import numpy as np
 import xarray as xr
+import glob
 
 def fesom_sea_ice_area(
     src_path,
@@ -456,6 +457,107 @@ def hadlsst_ice_area(src_path,
 
     result.attrs['units'] = 'm^2'
     result.attrs['long_name'] = 'total sea ice area'
+    result.attrs['bounding box'] = (
+        f"Longitude: {box[0]}E to {box[1]}E, Latitude: {box[2]}N to {box[3]}N"
+    )
+
+    if grouping == 'annual.mean':
+        result = result.groupby('time.year').mean('time')
+    elif grouping == 'annual.max':
+        result = result.groupby('time.year').max('time')
+    elif grouping == 'annual.min':
+        result = result.groupby('time.year').min('time')
+    elif grouping == 'monthly.mean':
+        pass
+    
+    print('Done!')
+    return result
+
+
+def osisaf_ice_diag(src_path,
+    years=(1979, 2015),
+    box=[-180, 180, -90, -50],
+    siconc_threshold=0.15,
+    grouping='annual.mean',
+    diag='area',               
+    log=True):
+
+    """
+    Compute total sea ice area from OSISAF_v3p0 data within a geographic region.
+
+    This function loads OSISAF_v3p0 sea ice concentration data, reprojects it from 
+    polar stereographic coordinates to regular lat/lon, and calculates the 
+    total sea ice area where concentration exceeds a given threshold.
+
+    Parameters
+    ----------
+    src_path : str
+        Path to directory containing SIC NetCDF files named as 'sic.<year>.nc'.
+    years : tuple of int, optional
+        Start and end year (exclusive) for processing, e.g., (1979, 2015).
+    box : list of float, optional
+        Geographic bounding box [lon_min, lon_max, lat_min, lat_max] for area calculation.
+    siconc_threshold : float, optional
+        Sea ice concentration threshold above which a grid cell is counted as ice-covered (default is 0.15).
+    log : bool, optional
+        If True, print progress messages during processing.
+
+    Returns
+    -------
+    xarray.DataArray
+        Time series of total sea ice area (in km²) per time step within the specified region.
+
+    Notes
+    -----
+    - Assumes a constant 25 km x 25 km grid cell size.
+
+    """
+    
+    
+    files2load = []
+
+    for y in range(years[0], years[1]):
+        files2load.extend(glob.glob(f"{src_path}/ice_conc_sh*{y}*.nc"))
+
+    files2load = sorted(files2load) 
+    
+    var = 'ice_conc'
+
+    # Open files with cftime decoder
+    time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+
+    result = []
+    for file in files2load:    
+    
+        ds = xr.open_dataset(file, decode_times=time_coder).load()
+        if log:
+            print(f"File loaded: {file}", flush=True)
+
+        # Compute sea ice area
+        mask_geo = (
+            (ds.lat >= box[2]) & (ds.lat <= box[3]) &
+            (ds.lon >= box[0]) & (ds.lon <= box[1])
+        )
+
+        mask_isice = ds[var] > (siconc_threshold*100) # ice_conc is in %
+    
+        gridcell_area = 25000 * 25000 # m^2
+
+        if diag=='area':
+            ice_area = (((ds[var]/100) * mask_geo * mask_isice) * gridcell_area).sum(dim=('xc','yc'))
+            name = 'sea_ice_area'
+        elif diag=='extent':
+            ice_area = ((mask_geo * mask_isice) * gridcell_area).sum(dim=('xc','yc'))
+            name = 'sea_ice_extent'
+        
+        ice_area = ice_area.where(ice_area>0,np.nan)
+
+        result.append(ice_area)
+
+    result = xr.concat(result, dim='time').rename(name)
+
+    result.attrs['units'] = 'm^2'
+    result.attrs['long_name'] = f'total {name}'
     result.attrs['bounding box'] = (
         f"Longitude: {box[0]}E to {box[1]}E, Latitude: {box[2]}N to {box[3]}N"
     )
