@@ -8,4 +8,5 @@ from .oifs48r3 import *
 from .lpjguess import *
 from .plotting import *
 from .miscellaneous import *
+from .reanalysis import *
 
