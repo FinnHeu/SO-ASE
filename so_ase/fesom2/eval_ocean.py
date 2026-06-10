@@ -1,4 +1,4 @@
-# so_ase.eval_ocean.py
+# so_ase/fesom2/eval_ocean.py
 
 import xarray as xr
 import numpy as np

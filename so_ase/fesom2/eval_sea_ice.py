@@ -1,13 +1,10 @@
-# so_ase.eval_sea_ice.py
+# so_ase/fesom2/eval_sea_ice.py
 
 import xarray as xr
 import numpy as np
-from .helpers_mesh import find_nodes_in_box, gridcell_area_hadley, reproject_to_latlon
-
-
 import os
-import numpy as np
-import xarray as xr
+from .helpers_mesh import find_nodes_in_box
+
 
 def fesom_sea_ice_area(
     src_path,

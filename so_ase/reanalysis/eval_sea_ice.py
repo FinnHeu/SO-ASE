@@ -1,14 +1,11 @@
-# so_ase.eval_sea_ice.py
+# so_ase/reanalysis/eval_sea_ice.py
 
 import xarray as xr
 import numpy as np
-from .helpers_mesh import find_nodes_in_box, gridcell_area_hadley, reproject_to_latlon
-
-
 import os
 import glob
-import numpy as np
-import xarray as xr
+
+from .helpers_grid import *
 
 def nsidc_ice_diag(src_path,
     years=(1979, 2015),
@@ -36,6 +33,12 @@ def nsidc_ice_diag(src_path,
         Geographic bounding box [lon_min, lon_max, lat_min, lat_max] for area calculation.
     siconc_threshold : float, optional
         Sea ice concentration threshold above which a grid cell is counted as ice-covered (default is 0.15).
+    grouping : {'annual.mean', 'annual.max', 'annual.min', 'monthly.mean'}, optional
+        Temporal aggregation applied to the computed sea-ice diagnostic. The default is 'annual.mean'.
+    version : {5, 6}, optional
+        NSIDC product version. Determines the variable name used during calculation.
+    diag : {'area', 'extent'}, optional
+        Which diagnostic to compute after filtering all cells exceeding the siconc_threshold: 'area' (concentration × cell area) or 'extent'(area of ALL cells exceeding siconc_threshold)
     log : bool, optional
         If True, print progress messages during processing.
 
@@ -134,6 +137,8 @@ def hadlsst_ice_area(src_path,
         Geographic bounding box [lon_min, lon_max, lat_min, lat_max] for area calculation.
     siconc_threshold : float, optional
         Sea ice concentration threshold above which a grid cell is counted as ice-covered (default is 0.15).
+    grouping : {'annual.mean', 'annual.max', 'annual.min', 'monthly.mean'}, optional
+        Temporal aggregation applied to the computed sea-ice diagnostic. The default is 'annual.mean'.
     log : bool, optional
         If True, print progress messages during processing.
 
@@ -218,6 +223,10 @@ def osisaf_ice_diag(src_path,
         Geographic bounding box [lon_min, lon_max, lat_min, lat_max] for area calculation.
     siconc_threshold : float, optional
         Sea ice concentration threshold above which a grid cell is counted as ice-covered (default is 0.15).
+    grouping : {'annual.mean', 'annual.max', 'annual.min', 'monthly.mean'}, optional
+        Temporal aggregation applied to the computed sea-ice diagnostic. The default is 'annual.mean'.
+    diag : {'area', 'extent'}, optional
+        Which diagnostic to compute after filtering all cells exceeding the siconc_threshold: 'area' (concentration × cell area) or 'extent'(area of ALL cells exceeding siconc_threshold)
     log : bool, optional
         If True, print progress messages during processing.
 
@@ -229,6 +238,7 @@ def osisaf_ice_diag(src_path,
     Notes
     -----
     - Assumes a constant 25 km x 25 km grid cell size.
+    - OSISAF SIC is stored as percent values (0–100) and is internally converted to fractional concentration (0–1) for area calculations.
 
     """
     

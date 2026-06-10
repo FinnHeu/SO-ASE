@@ -1,4 +1,4 @@
-# so_ase.helpers_interpolation.py
+# so_ase/fesom2/helpers_interpolation.py
 
 import sys
 import xarray as xr
