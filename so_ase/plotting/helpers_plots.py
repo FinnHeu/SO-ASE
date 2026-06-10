@@ -1,3 +1,5 @@
+# so_ase/plotting/helpers_plots.py
+
 import ipynbname
 import matplotlib.pyplot as plt
 import numpy as np
