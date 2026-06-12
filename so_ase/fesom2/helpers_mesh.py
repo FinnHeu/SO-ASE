@@ -754,7 +754,85 @@ def build_spherical_nn_mapper(lon_source, lat_source,
 
     return indices, distances
 
-###--------> 7. Build Land Sea Mask
+###--------> 7. Coordinate Transformations
+
+def unrotate_coordinates(al, be, ga, rlon, rlat):
+    """
+    Converts rotated coordinates to geographical coordinates.
+
+    Parameters
+    ----------
+    al : float
+        alpha Euler angle
+    be : float
+        beta Euler angle
+    ga : float
+        gamma Euler angle
+    rlon : array
+        1d array of longitudes in rotated coordinates
+    rlat : array
+        1d araay of latitudes in rotated coordinates
+
+    Returns
+    -------
+    lon : array
+        1d array of longitudes in geographical coordinates
+    lat : array
+        1d array of latitudes in geographical coordinates
+
+    """
+    import math as mt
+    
+    rad = mt.pi / 180
+    al = al * rad
+    be = be * rad
+    ga = ga * rad
+    rotate_matrix = np.zeros(shape=(3, 3))
+    rotate_matrix[0, 0] = np.cos(ga) * np.cos(al) - np.sin(ga) * np.cos(be) * np.sin(al)
+    rotate_matrix[0, 1] = np.cos(ga) * np.sin(al) + np.sin(ga) * np.cos(be) * np.cos(al)
+    rotate_matrix[0, 2] = np.sin(ga) * np.sin(be)
+    rotate_matrix[1, 0] = -np.sin(ga) * np.cos(al) - np.cos(ga) * np.cos(be) * np.sin(
+        al
+    )
+    rotate_matrix[1, 1] = -np.sin(ga) * np.sin(al) + np.cos(ga) * np.cos(be) * np.cos(
+        al
+    )
+    rotate_matrix[1, 2] = np.cos(ga) * np.sin(be)
+    rotate_matrix[2, 0] = np.sin(be) * np.sin(al)
+    rotate_matrix[2, 1] = -np.sin(be) * np.cos(al)
+    rotate_matrix[2, 2] = np.cos(be)
+
+    rotate_matrix = np.linalg.pinv(rotate_matrix)
+
+    rlat = rlat * rad
+    rlon = rlon * rad
+
+    # Rotated Cartesian coordinates:
+    xr = np.cos(rlat) * np.cos(rlon)
+    yr = np.cos(rlat) * np.sin(rlon)
+    zr = np.sin(rlat)
+
+    # Geographical Cartesian coordinates:
+    xg = rotate_matrix[0, 0] * xr + rotate_matrix[0, 1] * yr + rotate_matrix[0, 2] * zr
+    yg = rotate_matrix[1, 0] * xr + rotate_matrix[1, 1] * yr + rotate_matrix[1, 2] * zr
+    zg = (
+        rotate_matrix[2, 0] * xr + rotate_matrix[2, 1] * yr + rotate_matrix[2, 2] * zr
+    )
+
+    # Geographical coordinates:
+    lat = np.arcsin(zg)
+    lon = np.arctan2(yg, xg)
+
+    a = np.where((np.abs(xg) + np.abs(yg)) == 0)
+    if a:
+        lon[a] = 0
+
+    lat = lat / rad
+    lon = lon / rad
+
+    return lon, lat
+
+###--------> 8. Build Land Sea Mask
 
 def build_land_sea_mask(meshpath, nlon=1440, nlat=720, has_cavity=True, cavity_is_land=True):
     """
