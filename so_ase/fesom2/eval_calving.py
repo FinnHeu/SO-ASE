@@ -1,4 +1,4 @@
-# so_ase.eval_calving.py
+# so_ase/fesom2/eval_calving.py
 
 import xarray as xr
 from ..miscellaneous.helpers_misc import seconds_per_month

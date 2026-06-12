@@ -1,4 +1,4 @@
-# so_ase.eval_icebergs.py
+# so_ase/fesom2/eval_icebergs.py
 
 import numpy as np
 import xarray as xr

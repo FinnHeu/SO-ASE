@@ -1,4 +1,4 @@
-# so_ase/plotting_maps.py
+# so_ase/plotting/plotting_maps.py
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker

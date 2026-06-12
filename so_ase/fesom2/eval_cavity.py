@@ -1,4 +1,4 @@
-# so_ase.eval_cavity.py
+# so_ase/fesom2/eval_cavity.py
 
 import os
 import xarray as xr
