@@ -3,7 +3,7 @@
 # =============================================================================
 # DARS2 to DARS2cav: LPJ-GUESS Restart File Extrapolation
 # =============================================================================
-# Author: Finn Heukamp, 2025
+# Author: Finn Heukamp, 2026
 #
 # This script converts LPJ-GUESS restart files from a DARS2 simulation to 
 # be compatible with a DARS2cav simulation using a template-first approach.
@@ -38,13 +38,13 @@ import so_ase.lpjguess.helpers_restart as lpj_helpers
 # =============================================================================
 
 # Source restart files (DARS2 simulation)
-source_dir = '/work/bb1469/a270089/runtime/awiesm3-v3.4.2/AWI-ESM3-VEG-HR-CMIP7-Spinup_cont3/restart/lpj_guess/lpjg_state_1680'
+source_dir = '/work/bb1469/a270089/runtime/awiesm3-v3.4.2/AWI-ESM3-VEG-HR-CMIP7-piControl/restart/lpj_guess/lpjg_state_1930/'
 
 # Template restart files (DARS2cav/CAV-ICB structure)
-template_dir = '/work/ba1550/a270186/simulations/awiesm3-v3.4.1-CAV-ICB/preproduction/CAV-ICB-PICTRL-TEST-with_icb-7/restart/lpj_guess/lpjg_state_1608'
+template_dir = '/work/ba1550/a270186/simulations/awiesm3-v3.4.1-CAV-ICB/preproduction/CAV-ICB-PICTRL-TEST-with_icb-7/restart/lpj_guess/lpjg_state_1608/'
 
 # Output directory for converted restart files
-output_dir = '/home/a/a270186/python_modules/SO-ASE/test/'
+output_dir = '/work/ba1550/a270186/simulations/awiesm3-v3.4.2-CAV-ICB/production/restarts/CAV-ICB-PICTRL/lpjguess/'
 
 # =============================================================================
 # ============================ SET LOG FILES ==================================
