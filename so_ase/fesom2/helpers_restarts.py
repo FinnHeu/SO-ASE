@@ -3,7 +3,11 @@
 import xarray as xr
 import numpy as np
 from scipy.spatial import cKDTree
+import os
+from .helpers_mesh import read_nodes, read_elements, read_element_levels, build_cavity_mask, find_element_for_points    
+from .eval_icebergs import read_iceberg_restart_file
 
+###--------> 1. FESOM ocean/ice restart files
 
 def build_spherical_nn_mapper(lon_source, lat_source,
                               lon_target, lat_target):
@@ -349,3 +353,201 @@ def fill_cavities_from_existing_restart(varname, path_restart_src, path_restart_
 
     # Save the filled dataset
     ds_to_fill.to_netcdf(f"{path_restart_dst}{varname}.nc")
+
+
+###--------> 2. FESOM iceberg restart files
+
+def icbdat_from_ismrestart(srcpath, dstpath, meshpath=None, verbose=True):
+    """
+    Convert an iceberg.restart.ISM file into a set of corresponding initial icb_*.dat files.
+    
+    Parameters
+    ----------
+    srcpath : str
+        Path to the directory containing iceberg.restart.ISM file.
+    dstpath : str
+        Path to the output directory for icb_*.dat files.
+    meshpath : str, optional
+        Path to the target mesh directory. If provided, icebergs are filtered to only
+        include those in valid open ocean elements (not cavity, not coastal nodes).
+    verbose : bool, optional
+        Whether to print progress information, by default True.
+    
+    Notes
+    -----
+    Creates the following files in dstpath:
+        - icb_longitude.dat : Longitude in geographical coordinates
+        - icb_latitude.dat : Latitude in geographical coordinates
+        - icb_height.dat : Iceberg height
+        - icb_length.dat : Iceberg length
+        - icb_scaling.dat : Scaling factor
+        - icb_calving_day.dat : Calving day
+    """
+    
+    if verbose:
+        print('============ icbdat_from_restart ==============')
+        print(f'Source: {srcpath}/iceberg.restart.ISM')
+        print(f'Destination: {dstpath}')
+        if meshpath:
+            print(f'Target mesh: {meshpath}')
+    
+    # Read the restart file (unrotate coordinates for output)
+    ds_icb = read_iceberg_restart_file(f"{srcpath}/iceberg.restart.ISM", unrotate=True)
+    
+    n_icebergs = len(ds_icb.ib)
+    if verbose:
+        print(f'Number of icebergs in restart: {n_icebergs}')
+    
+    # Optional mesh element check
+    if meshpath is not None:
+        if verbose:
+            print('Checking iceberg locations on target mesh...')
+        
+        # Read mesh data
+        node_lon, node_lat, node_idx, node_coast = read_nodes(meshpath)
+        elements = read_elements(meshpath)
+        cavity_elvls = read_element_levels(meshpath, which='cavity', raw=False, python_indexing=False)
+        
+        # Build node cavity mask (node is cavity if all its elements are cavity)
+        node_cavity_mask = build_cavity_mask(meshpath, which='node')
+        
+        # Load forbidden elements from cache file if available
+        # For restart conversion, we want icebergs only in pure open ocean:
+        # NOT in cavity elements, NOT in calving front elements, NOT in seeding elements
+        cache_file = os.path.join(meshpath, "elem_icb_seeding.npz")
+        forbidden_elems = set()
+        if os.path.exists(cache_file):
+            if verbose:
+                print(f'  Loading seeding constraints from: {cache_file}')
+            cache_data = np.load(cache_file, allow_pickle=True)
+            # Calving front elements are forbidden
+            calving_front_elems = set(cache_data['all_calving_front'])
+            # Seeding elements (near calving front) are also forbidden for restart conversion
+            seeding_elems = set(cache_data['all_seeding_elems'])
+            # Combine both into forbidden set
+            forbidden_elems = calving_front_elems | seeding_elems
+            if verbose:
+                print(f'  Calving front elements: {len(calving_front_elems)}')
+                print(f'  Seeding elements (near calving front): {len(seeding_elems)}')
+                print(f'  Total forbidden elements: {len(forbidden_elems)}')
+        else:
+            if verbose:
+                print(f'  Warning: Cache file not found: {cache_file}')
+                print(f'  Skipping forbidden element check.')
+        
+        # Find element for each iceberg
+        elem_indices = find_element_for_points(
+            ds_icb['lon_deg'].values,
+            ds_icb['lat_deg'].values,
+            node_lon, node_lat, elements
+        )
+        
+        # Check validity of each iceberg location
+        # Only pure open ocean elements are allowed (not cavity, not calving front, not seeding)
+        valid_mask = np.ones(n_icebergs, dtype=bool)
+        n_not_in_elem = 0
+        n_in_cavity = 0
+        n_near_coast_cavity = 0
+        n_in_forbidden = 0
+        
+        for i in range(n_icebergs):
+            eidx = elem_indices[i]
+            
+            # Check if iceberg is in any element
+            if eidx == -1:
+                valid_mask[i] = False
+                n_not_in_elem += 1
+                continue
+            
+            # Check if element is not a cavity element (cavity_elvls == 1 means open ocean)
+            if cavity_elvls[eidx] > 1:
+                valid_mask[i] = False
+                n_in_cavity += 1
+                continue
+            
+            # Check if all three nodes are valid (not coastal and not cavity)
+            n1, n2, n3 = elements[eidx]
+            node_invalid = False
+            for node in [n1, n2, n3]:
+                # Check if node is coastal
+                if node_coast[node] == 1:
+                    node_invalid = True
+                    break
+                # Check if node is in cavity
+                if node_cavity_mask[node]:
+                    node_invalid = True
+                    break
+            if node_invalid:
+                valid_mask[i] = False
+                n_near_coast_cavity += 1
+                continue
+            
+            # Check if element is in forbidden elements (calving front or seeding elements)
+            if eidx in forbidden_elems:
+                valid_mask[i] = False
+                n_in_forbidden += 1
+                continue
+        
+        # Filter dataset to valid icebergs
+        n_valid = valid_mask.sum()
+        
+        if verbose:
+            print(f'  Icebergs not in any element: {n_not_in_elem}')
+            print(f'  Icebergs in cavity elements: {n_in_cavity}')
+            print(f'  Icebergs near coast/cavity nodes: {n_near_coast_cavity}')
+            print(f'  Icebergs in forbidden elements (calving front + seeding): {n_in_forbidden}')
+            print(f'  Valid icebergs (pure open ocean): {n_valid} / {n_icebergs}')
+        
+        # Apply filter
+        ds_icb = ds_icb.isel(ib=valid_mask)
+        n_icebergs = n_valid
+    
+    # Create output directory if it doesn't exist
+    os.makedirs(dstpath, exist_ok=True)
+    
+    # Write icb_longitude.dat (geographical coordinates)
+    with open(f'{dstpath}/icb_longitude.dat', 'w') as f:
+        for val in ds_icb['lon_deg'].values:
+            f.write(f'{val}\n')
+    if verbose:
+        print(f'  Written: icb_longitude.dat')
+    
+    # Write icb_latitude.dat (geographical coordinates)
+    with open(f'{dstpath}/icb_latitude.dat', 'w') as f:
+        for val in ds_icb['lat_deg'].values:
+            f.write(f'{val}\n')
+    if verbose:
+        print(f'  Written: icb_latitude.dat')
+    
+    # Write icb_height.dat
+    with open(f'{dstpath}/icb_height.dat', 'w') as f:
+        for val in ds_icb['height_ib'].values:
+            f.write(f'{val}\n')
+    if verbose:
+        print(f'  Written: icb_height.dat')
+    
+    # Write icb_length.dat
+    with open(f'{dstpath}/icb_length.dat', 'w') as f:
+        for val in ds_icb['length_ib'].values:
+            f.write(f'{val}\n')
+    if verbose:
+        print(f'  Written: icb_length.dat')
+    
+    # Write icb_scaling.dat
+    with open(f'{dstpath}/icb_scaling.dat', 'w') as f:
+        for val in ds_icb['scaling'].values:
+            f.write(f'{int(val)}\n')
+    if verbose:
+        print(f'  Written: icb_scaling.dat')
+    
+    # Write icb_calving_day.dat
+    with open(f'{dstpath}/icb_calving_day.dat', 'w') as f:
+        for val in ds_icb['calving_day'].values:
+            f.write(f'{int(val)}\n')
+    if verbose:
+        print(f'  Written: icb_calving_day.dat')
+    
+    if verbose:
+        print('Done.')
+    
+    return

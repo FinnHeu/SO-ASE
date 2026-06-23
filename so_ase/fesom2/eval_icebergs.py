@@ -2,17 +2,19 @@
 
 import numpy as np
 import xarray as xr
+import re
+import io
+    
 from .helpers_mesh import unrotate_coordinates
 
 def read_iceberg_initial_files(icebergpath):
     """Reads iceberg initial condition files from the specified directory.
     
     Parameters:
-        icebergpath (str): Path to the directory containing iceberg initial condition files.
+        icebergpath (str): Path to the directory containing iceberg initial condition files (icb*.dat).
         
     Returns:
-        array: Arrays containing iceberg longitude, latitude, height, face element indices,
-               length, and scaling factors.
+        xarray.Dataset: Dataset containing iceberg initial conditions with dimension 'ib'.
     """
 
     def read_dat(filepath):
@@ -27,11 +29,37 @@ def read_iceberg_initial_files(icebergpath):
     icb_lon = read_dat(icebergpath + "/icb_longitude.dat")
     icb_lat = read_dat(icebergpath + "/icb_latitude.dat")
     icb_height = read_dat(icebergpath + "/icb_height.dat")
-    icb_felem = read_dat(icebergpath + "/icb_felem.dat").astype(int)
     icb_length = read_dat(icebergpath + "/icb_length.dat")
-    icb_scaling = read_dat(icebergpath + "/icb_scaling.dat")
+    icb_scaling = read_dat(icebergpath + "/icb_scaling.dat").astype(int)
+    icb_calving_day = read_dat(icebergpath + "/icb_calving_day.dat").astype(int)
 
-    return icb_lon, icb_lat, icb_height, icb_felem, icb_length, icb_scaling
+    # Create xarray dataset
+    ds = xr.Dataset(
+        data_vars={
+            'lon_deg': (['ib'], icb_lon),
+            'lat_deg': (['ib'], icb_lat),
+            'height_ib': (['ib'], icb_height),
+            'length_ib': (['ib'], icb_length),
+            'scaling': (['ib'], icb_scaling),
+            'calving_day': (['ib'], icb_calving_day)
+        },
+        coords={'ib': np.arange(1, len(icb_lon) + 1)},
+        attrs={
+            'description': 'Iceberg initial condition data',
+            'source_path': icebergpath,
+            'format': 'FESOM iceberg initial files'
+        }
+    )
+    
+    # Add variable attributes
+    ds['lon_deg'].attrs = {'long_name': 'geographical longitude (unrotated)', 'units': 'degrees'}
+    ds['lat_deg'].attrs = {'long_name': 'geographical latitude (unrotated)', 'units': 'degrees'}
+    ds['height_ib'].attrs = {'long_name': 'iceberg height', 'units': 'm'}
+    ds['length_ib'].attrs = {'long_name': 'iceberg length', 'units': 'm'}
+    ds['scaling'].attrs = {'long_name': 'scaling factor', 'units': '1'}
+    ds['calving_day'].attrs = {'long_name': 'calving day', 'units': 'days'}
+    
+    return ds
 
 
 def iceberg_occurrence_heatmap(trackfile, lon_res=1.0, lat_res=1.0, lon_range=(-180, 180), lat_range=(-90, 90)):
@@ -124,8 +152,13 @@ def read_iceberg_restart_file(icebergpath, unrotate=True):
         ('grounded', 'U1'), ('scaling', 'i8'), ('melted', 'U1')
     ]
     
-    # Read the data
-    data = np.loadtxt(icebergpath, dtype=dtype)
+    with open(icebergpath, 'r') as f:
+        content = f.read()
+    # Fix patterns like "0.1234567-310" -> "0.1234567E-310" and "0.1234567+100" -> "0.1234567E+100"
+    content = re.sub(r'(\d)([+-])(\d{2,3})(\s|$)', r'\1E\2\3\4', content)
+    
+    # Read the data from the fixed content
+    data = np.loadtxt(io.StringIO(content), dtype=dtype)
     
     # Convert boolean flags from characters to bool
     find_iceberg_elem = data['find_iceberg_elem'] == b'F'
