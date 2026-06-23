@@ -2,16 +2,19 @@
 
 import numpy as np
 import xarray as xr
+import re
+import io
+    
+from .helpers_mesh import unrotate_coordinates
 
 def read_iceberg_initial_files(icebergpath):
     """Reads iceberg initial condition files from the specified directory.
     
     Parameters:
-        icebergpath (str): Path to the directory containing iceberg initial condition files.
+        icebergpath (str): Path to the directory containing iceberg initial condition files (icb*.dat).
         
     Returns:
-        array: Arrays containing iceberg longitude, latitude, height, face element indices,
-               length, and scaling factors.
+        xarray.Dataset: Dataset containing iceberg initial conditions with dimension 'ib'.
     """
 
     def read_dat(filepath):
@@ -26,11 +29,37 @@ def read_iceberg_initial_files(icebergpath):
     icb_lon = read_dat(icebergpath + "/icb_longitude.dat")
     icb_lat = read_dat(icebergpath + "/icb_latitude.dat")
     icb_height = read_dat(icebergpath + "/icb_height.dat")
-    icb_felem = read_dat(icebergpath + "/icb_felem.dat").astype(int)
     icb_length = read_dat(icebergpath + "/icb_length.dat")
-    icb_scaling = read_dat(icebergpath + "/icb_scaling.dat")
+    icb_scaling = read_dat(icebergpath + "/icb_scaling.dat").astype(int)
+    icb_calving_day = read_dat(icebergpath + "/icb_calving_day.dat").astype(int)
 
-    return icb_lon, icb_lat, icb_height, icb_felem, icb_length, icb_scaling
+    # Create xarray dataset
+    ds = xr.Dataset(
+        data_vars={
+            'lon_deg': (['ib'], icb_lon),
+            'lat_deg': (['ib'], icb_lat),
+            'height_ib': (['ib'], icb_height),
+            'length_ib': (['ib'], icb_length),
+            'scaling': (['ib'], icb_scaling),
+            'calving_day': (['ib'], icb_calving_day)
+        },
+        coords={'ib': np.arange(1, len(icb_lon) + 1)},
+        attrs={
+            'description': 'Iceberg initial condition data',
+            'source_path': icebergpath,
+            'format': 'FESOM iceberg initial files'
+        }
+    )
+    
+    # Add variable attributes
+    ds['lon_deg'].attrs = {'long_name': 'geographical longitude (unrotated)', 'units': 'degrees'}
+    ds['lat_deg'].attrs = {'long_name': 'geographical latitude (unrotated)', 'units': 'degrees'}
+    ds['height_ib'].attrs = {'long_name': 'iceberg height', 'units': 'm'}
+    ds['length_ib'].attrs = {'long_name': 'iceberg length', 'units': 'm'}
+    ds['scaling'].attrs = {'long_name': 'scaling factor', 'units': '1'}
+    ds['calving_day'].attrs = {'long_name': 'calving day', 'units': 'days'}
+    
+    return ds
 
 
 def iceberg_occurrence_heatmap(trackfile, lon_res=1.0, lat_res=1.0, lon_range=(-180, 180), lat_range=(-90, 90)):
@@ -92,3 +121,115 @@ def iceberg_occurrence_heatmap(trackfile, lon_res=1.0, lat_res=1.0, lon_range=(-
     
     ds.close()
     return ds_out
+
+
+def read_iceberg_restart_file(icebergpath, unrotate=True):
+    """Reads iceberg restart file and returns content as xarray dataset.
+    
+    Parameters:
+        icebergpath (str): Path to the iceberg.restart.ISM file.
+        unrotate (bool): Whether to unrotate coordinates to regular lat/lon (default: True)
+        
+    Returns:
+        xarray.Dataset: Dataset containing all iceberg restart variables with dimension 'ib'.
+    """
+    # Define column names and their data types
+    column_names = [
+        'height_ib', 'length_ib', 'width_ib', 'lon_deg', 'lat_deg', 'Co', 'Ca', 'Ci',
+        'Cdo_skin', 'Cda_skin', 'rho_icb', 'conc_sill', 'P_sill', 'rho_h2o', 'rho_air',
+        'rho_ice', 'u_ib', 'v_ib', 'iceberg_elem', 'find_iceberg_elem', 'f_u_ib_old',
+        'f_v_ib_old', 'calving_day', 'grounded', 'scaling', 'melted'
+    ]
+    
+    # Read the file using numpy's loadtxt with structured dtype
+    dtype = [
+        ('height_ib', 'f8'), ('length_ib', 'f8'), ('width_ib', 'f8'),
+        ('lon_deg', 'f8'), ('lat_deg', 'f8'), ('Co', 'f8'), ('Ca', 'f8'), ('Ci', 'f8'),
+        ('Cdo_skin', 'f8'), ('Cda_skin', 'f8'), ('rho_icb', 'f8'), ('conc_sill', 'f8'),
+        ('P_sill', 'f8'), ('rho_h2o', 'f8'), ('rho_air', 'f8'), ('rho_ice', 'f8'),
+        ('u_ib', 'f8'), ('v_ib', 'f8'), ('iceberg_elem', 'i8'), ('find_iceberg_elem', 'U1'),
+        ('f_u_ib_old', 'f8'), ('f_v_ib_old', 'f8'), ('calving_day', 'i8'),
+        ('grounded', 'U1'), ('scaling', 'i8'), ('melted', 'U1')
+    ]
+    
+    with open(icebergpath, 'r') as f:
+        content = f.read()
+    # Fix patterns like "0.1234567-310" -> "0.1234567E-310" and "0.1234567+100" -> "0.1234567E+100"
+    content = re.sub(r'(\d)([+-])(\d{2,3})(\s|$)', r'\1E\2\3\4', content)
+    
+    # Read the data from the fixed content
+    data = np.loadtxt(io.StringIO(content), dtype=dtype)
+    
+    # Convert boolean flags from characters to bool
+    find_iceberg_elem = data['find_iceberg_elem'] == b'F'
+    grounded = data['grounded'] == b'F'
+    melted = data['melted'] == b'F'
+    
+    # Create data dictionary for xarray
+    data_vars = {}
+    for i, name in enumerate(column_names):
+        if name in ['find_iceberg_elem', 'grounded', 'melted']:
+            # Handle boolean flags
+            if name == 'find_iceberg_elem':
+                data_vars[name] = (['ib'], find_iceberg_elem)
+            elif name == 'grounded':
+                data_vars[name] = (['ib'], grounded)
+            elif name == 'melted':
+                data_vars[name] = (['ib'], melted)
+        else:
+            # Handle numeric values
+            data_vars[name] = (['ib'], data[name])
+    
+    # Create xarray dataset
+    ds = xr.Dataset(
+        data_vars=data_vars,
+        coords={'ib': np.arange(len(data))},
+        attrs={
+            'description': 'Iceberg restart file data',
+            'source_file': icebergpath,
+            'format': 'FESOM iceberg.restart.ISM'
+        }
+    )
+    
+    # Add variable attributes
+    ds['height_ib'].attrs = {'long_name': 'iceberg height', 'units': 'm'}
+    ds['length_ib'].attrs = {'long_name': 'iceberg length', 'units': 'm'}
+    ds['width_ib'].attrs = {'long_name': 'iceberg width', 'units': 'm'}
+    ds['lon_deg'].attrs = {'long_name': 'longitude', 'units': 'degrees'}
+    ds['lat_deg'].attrs = {'long_name': 'latitude', 'units': 'degrees'}
+    ds['Co'].attrs = {'long_name': 'drag coefficient', 'units': '1'}
+    ds['Ca'].attrs = {'long_name': 'added mass coefficient', 'units': '1'}
+    ds['Ci'].attrs = {'long_name': 'inertia coefficient', 'units': '1'}
+    ds['Cdo_skin'].attrs = {'long_name': 'skin drag coefficient (ocean)', 'units': '1'}
+    ds['Cda_skin'].attrs = {'long_name': 'skin drag coefficient (air)', 'units': '1'}
+    ds['rho_icb'].attrs = {'long_name': 'iceberg density', 'units': 'kg/m^3'}
+    ds['conc_sill'].attrs = {'long_name': 'concentration sill', 'units': '1'}
+    ds['P_sill'].attrs = {'long_name': 'pressure sill', 'units': 'Pa'}
+    ds['rho_h2o'].attrs = {'long_name': 'water density', 'units': 'kg/m^3'}
+    ds['rho_air'].attrs = {'long_name': 'air density', 'units': 'kg/m^3'}
+    ds['rho_ice'].attrs = {'long_name': 'ice density', 'units': 'kg/m^3'}
+    ds['u_ib'].attrs = {'long_name': 'iceberg u-velocity', 'units': 'm/s'}
+    ds['v_ib'].attrs = {'long_name': 'iceberg v-velocity', 'units': 'm/s'}
+    ds['iceberg_elem'].attrs = {'long_name': 'iceberg element index', 'units': '1'}
+    ds['find_iceberg_elem'].attrs = {'long_name': 'find iceberg element flag', 'units': '1'}
+    ds['f_u_ib_old'].attrs = {'long_name': 'old u-force', 'units': 'N'}
+    ds['f_v_ib_old'].attrs = {'long_name': 'old v-force', 'units': 'N'}
+    ds['calving_day'].attrs = {'long_name': 'calving day', 'units': 'days'}
+    ds['grounded'].attrs = {'long_name': 'grounded flag', 'units': '1'}
+    ds['scaling'].attrs = {'long_name': 'scaling factor', 'units': '1'}
+    ds['melted'].attrs = {'long_name': 'melted flag', 'units': '1'}
+    
+    # Unrotate coordinates if requested
+    if unrotate:
+        lon_unrot, lat_unrot = unrotate_coordinates(50.0, 15.0, -90.0, ds['lon_deg'].values, ds['lat_deg'].values)
+        
+        # Replace original coordinates with unrotated ones
+        ds['lon_deg'] = (['ib'], lon_unrot)
+        ds['lat_deg'] = (['ib'], lat_unrot)
+        
+        # Update attributes to indicate these are now unrotated coordinates
+        ds['lon_deg'].attrs = {'long_name': 'longitude (unrotated)', 'units': 'degrees'}
+        ds['lat_deg'].attrs = {'long_name': 'latitude (unrotated)', 'units': 'degrees'}
+    
+    return ds
+

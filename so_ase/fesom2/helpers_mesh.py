@@ -402,6 +402,70 @@ def find_nodes_in_box(
     
     return inds
 
+def find_element_for_points(lon_points, lat_points, node_lon, node_lat, elements):
+    """
+    Find the mesh element index for each point (lon, lat).
+    
+    Parameters
+    ----------
+    lon_points : array-like
+        Longitudes of points in degrees.
+    lat_points : array-like
+        Latitudes of points in degrees.
+    node_lon : array
+        Longitudes of mesh nodes.
+    node_lat : array
+        Latitudes of mesh nodes.
+    elements : array
+        Element connectivity array (n_elem, 3).
+    
+    Returns
+    -------
+    elem_indices : ndarray
+        Element index (0-based) for each point. Returns -1 if point is not found in any element.
+    """
+    from scipy.spatial import cKDTree
+    
+    lon_points = np.asarray(lon_points)
+    lat_points = np.asarray(lat_points)
+    n_points = len(lon_points)
+    
+    elem_indices = np.full(n_points, -1, dtype=np.int64)
+    
+    def point_in_triangle(px, py, x1, y1, x2, y2, x3, y3):
+        denom = (y2 - y3) * (x1 - x3) + (x3 - x2) * (y1 - y3)
+        if abs(denom) < 1e-12:
+            return False
+        a = ((y2 - y3) * (px - x3) + (x3 - x2) * (py - y3)) / denom
+        b = ((y3 - y1) * (px - x3) + (x1 - x3) * (py - y3)) / denom
+        c = 1 - a - b
+        return (a >= -1e-10) and (b >= -1e-10) and (c >= -1e-10)
+    
+    # Build element centroids for quick filtering
+    elem_lon = node_lon[elements].mean(axis=1)
+    elem_lat = node_lat[elements].mean(axis=1)
+    
+    # Build KDTree on element centroids for fast nearest-neighbor search
+    tree = cKDTree(np.column_stack([elem_lon, elem_lat]))
+    
+    for i in range(n_points):
+        px, py = lon_points[i], lat_points[i]
+        
+        # Find nearest elements to check
+        _, candidate_elems = tree.query([px, py], k=min(100, len(elements)))
+        
+        for eidx in candidate_elems:
+            n1, n2, n3 = elements[eidx]
+            x1, y1 = node_lon[n1], node_lat[n1]
+            x2, y2 = node_lon[n2], node_lat[n2]
+            x3, y3 = node_lon[n3], node_lat[n3]
+            
+            if point_in_triangle(px, py, x1, y1, x2, y2, x3, y3):
+                elem_indices[i] = eidx
+                break
+    
+    return elem_indices
+
 def build_cavity_mask(meshpath, which='element'):
     """
     Builds a cavity mask for either elements or nodes based on cavity levels.
@@ -754,7 +818,85 @@ def build_spherical_nn_mapper(lon_source, lat_source,
 
     return indices, distances
 
-###--------> 7. Build Land Sea Mask
+###--------> 7. Coordinate Transformations
+
+def unrotate_coordinates(al, be, ga, rlon, rlat):
+    """
+    Converts rotated coordinates to geographical coordinates.
+
+    Parameters
+    ----------
+    al : float
+        alpha Euler angle
+    be : float
+        beta Euler angle
+    ga : float
+        gamma Euler angle
+    rlon : array
+        1d array of longitudes in rotated coordinates
+    rlat : array
+        1d araay of latitudes in rotated coordinates
+
+    Returns
+    -------
+    lon : array
+        1d array of longitudes in geographical coordinates
+    lat : array
+        1d array of latitudes in geographical coordinates
+
+    """
+    import math as mt
+    
+    rad = mt.pi / 180
+    al = al * rad
+    be = be * rad
+    ga = ga * rad
+    rotate_matrix = np.zeros(shape=(3, 3))
+    rotate_matrix[0, 0] = np.cos(ga) * np.cos(al) - np.sin(ga) * np.cos(be) * np.sin(al)
+    rotate_matrix[0, 1] = np.cos(ga) * np.sin(al) + np.sin(ga) * np.cos(be) * np.cos(al)
+    rotate_matrix[0, 2] = np.sin(ga) * np.sin(be)
+    rotate_matrix[1, 0] = -np.sin(ga) * np.cos(al) - np.cos(ga) * np.cos(be) * np.sin(
+        al
+    )
+    rotate_matrix[1, 1] = -np.sin(ga) * np.sin(al) + np.cos(ga) * np.cos(be) * np.cos(
+        al
+    )
+    rotate_matrix[1, 2] = np.cos(ga) * np.sin(be)
+    rotate_matrix[2, 0] = np.sin(be) * np.sin(al)
+    rotate_matrix[2, 1] = -np.sin(be) * np.cos(al)
+    rotate_matrix[2, 2] = np.cos(be)
+
+    rotate_matrix = np.linalg.pinv(rotate_matrix)
+
+    rlat = rlat * rad
+    rlon = rlon * rad
+
+    # Rotated Cartesian coordinates:
+    xr = np.cos(rlat) * np.cos(rlon)
+    yr = np.cos(rlat) * np.sin(rlon)
+    zr = np.sin(rlat)
+
+    # Geographical Cartesian coordinates:
+    xg = rotate_matrix[0, 0] * xr + rotate_matrix[0, 1] * yr + rotate_matrix[0, 2] * zr
+    yg = rotate_matrix[1, 0] * xr + rotate_matrix[1, 1] * yr + rotate_matrix[1, 2] * zr
+    zg = (
+        rotate_matrix[2, 0] * xr + rotate_matrix[2, 1] * yr + rotate_matrix[2, 2] * zr
+    )
+
+    # Geographical coordinates:
+    lat = np.arcsin(zg)
+    lon = np.arctan2(yg, xg)
+
+    a = np.where((np.abs(xg) + np.abs(yg)) == 0)
+    if a:
+        lon[a] = 0
+
+    lat = lat / rad
+    lon = lon / rad
+
+    return lon, lat
+
+###--------> 8. Build Land Sea Mask
 
 def build_land_sea_mask(meshpath, nlon=1440, nlat=720, has_cavity=True, cavity_is_land=True):
     """
