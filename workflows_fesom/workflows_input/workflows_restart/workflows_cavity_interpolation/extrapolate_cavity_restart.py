@@ -85,21 +85,21 @@ path_mesh_src = "/work/ab0995/a270186/model_inputs/fesom2/mesh/DARS2/"
 path_mesh_tgt = "/work/ab0995/a270186/model_inputs/fesom2/mesh/DARS2cav/"
 
 # Restart files on DARS2 mesh which are supposed to be used on DARS2cav mesh
-path_restart_src_oce = f"/work/bb1469/a270089/runtime/awiesm3-v3.4.1/AWI-ESM3-VEG-HR-CMIP7-Spinup_cont2/restart/fesom/fesom.1599.oce.restart/"
-path_restart_src_ice = f"/work/bb1469/a270089/runtime/awiesm3-v3.4.1/AWI-ESM3-VEG-HR-CMIP7-Spinup_cont2/restart/fesom/fesom.1599.ice.restart/"
+path_restart_src_oce = f"/work/bb1469/a270089/runtime/awiesm3-v3.4.2/AWI-ESM3-VEG-HR-CMIP7-piControl/restart/fesom/fesom.1929.oce.restart/"
+path_restart_src_ice = f"/work/bb1469/a270089/runtime/awiesm3-v3.4.2/AWI-ESM3-VEG-HR-CMIP7-piControl/restart/fesom/fesom.1929.ice.restart/"
 
 # Restart files on DARS2cav mesh (template files of which the file structure is taken)
 path_restart_tgt_oce = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/DARS2cav/v2.7.1/fesom.oce.restart/"
 path_restart_tgt_ice = f"/work/ab0995/a270186/model_inputs/awicm3/pool/restarts/templates/DARS2cav/v2.7.1/fesom.ice.restart/"
 
-# Restart Destination (destination of the generated restart files to be used for the run)
-restart_year = 1599
-path_restart_dst_oce = f"/work/ba1550/a270186/simulations/awiesm3-v3.4.1/restarts/DARS2_to_DARS2cav/CAVini/fesom.{restart_year}.oce.restart/"
-path_restart_dst_ice = f"/work/ba1550/a270186/simulations/awiesm3-v3.4.1/restarts/DARS2_to_DARS2cav/CAVini/fesom.{restart_year}.ice.restart/"
+# Restart Destination (destination and year of the generated restart files to be used for the run)
+restart_year = 1849
+path_restart_dst_oce = f"/work/ba1550/a270186/simulations/awiesm3-v3.4.2-CAV-ICB/production/restarts/CAV-ICB-PICTRL/fesom/CAV-coldstart/fesom.{restart_year}.oce.restart/"
+path_restart_dst_ice = f"/work/ba1550/a270186/simulations/awiesm3-v3.4.2-CAV-ICB/production/restarts/CAV-ICB-PICTRL/fesom/CAV-coldstart/fesom.{restart_year}.ice.restart/"
 
 # Plots Destination
 plot = True
-path_dst_plots = "./plots/"
+path_dst_plots = "./plots/extrapolation/"
 
 # Coupled Model (AWI-CM3 with FESOM2.7) also requires ice_temp.nc and ice_albedo.nc
 is_coupled = True

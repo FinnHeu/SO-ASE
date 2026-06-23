@@ -16,18 +16,18 @@ import so_ase as so
 # Mesh directories
 path_mesh = "/work/ab0995/a270186/model_inputs/fesom2/mesh/DARS2cav/"
 
-# Restart Source (already generated restarts on DARS2cav grid for the branchoff initialization run)
-restart_year = 1599
-path_restart_src_oce = f"/work/ba1550/a270186/simulations/awiesm3-v3.4.1/restarts/DARS2_to_DARS2cav/CAVini/fesom.{restart_year}.oce.restart/"
-path_restart_src_ice = f"/work/ba1550/a270186/simulations/awiesm3-v3.4.1/restarts/DARS2_to_DARS2cav/CAVini/fesom.{restart_year}.ice.restart/"
+# Restart Source (already generated restarts on DARS2cav grid for the branchoff initialization run with coldstarted cavity)
+restart_year = 1849
+path_restart_src_oce = f"/work/ba1550/a270186/simulations/awiesm3-v3.4.2-CAV-ICB/production/restarts/CAV-ICB-PICTRL/fesom/CAV-coldstart/fesom.{restart_year}.oce.restart/"
+path_restart_src_ice = f"/work/ba1550/a270186/simulations/awiesm3-v3.4.2-CAV-ICB/production/restarts/CAV-ICB-PICTRL/fesom/CAV-coldstart/fesom.{restart_year}.ice.restart/"
 
 # Cavity Restart (restarts from which to take the cavity values)
-path_restart_cavity_fill_oce = "/work/ba1550/a270301/runtime/awiesm3-v3.4.1/branchoff_DARS2cav/restart/fesom/fesom.1611.oce.restart/"
-path_restart_cavity_fill_ice = "/work/ba1550/a270301/runtime/awiesm3-v3.4.1/branchoff_DARS2cav/restart/fesom/fesom.1611.ice.restart/"
+path_restart_cavity_fill_oce = "/work/ba1550/a270186/simulations/awiesm3-v3.4.2-CAV-ICB/production/CAV-INI-CONT1/restart/fesom/fesom.1855.oce.restart/"
+path_restart_cavity_fill_ice = "/work/ba1550/a270186/simulations/awiesm3-v3.4.2-CAV-ICB/production/CAV-INI-CONT1/restart/fesom/fesom.1855.ice.restart/"
 
 # Restart Destination (location where restart files are going to be stored)
-path_restart_dst_oce = f"/work/ba1550/a270186/simulations/awiesm3-v3.4.1/restarts/DARS2_to_DARS2cav/CAV/fesom.{restart_year}.oce.restart/"
-path_restart_dst_ice = f"/work/ba1550/a270186/simulations/awiesm3-v3.4.1/restarts/DARS2_to_DARS2cav/CAV/fesom.{restart_year}.ice.restart/"
+path_restart_dst_oce = f"/work/ba1550/a270186/simulations/awiesm3-v3.4.2-CAV-ICB/production/restarts/CAV-ICB-PICTRL/fesom/CAV-refilled/fesom.{restart_year}.oce.restart/"
+path_restart_dst_ice = f"/work/ba1550/a270186/simulations/awiesm3-v3.4.2-CAV-ICB/production/restarts/CAV-ICB-PICTRL/fesom/CAV-refilled/fesom.{restart_year}.ice.restart/"
 
 # Plots
 plot = True
