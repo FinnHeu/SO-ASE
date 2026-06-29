@@ -2,6 +2,7 @@
 
 import xarray as xr
 import numpy as np
+from ..miscellaneous import seconds_per_month
 
 def total_annual_from_monthly_mean(ds, var='fw'):
     """
@@ -30,5 +31,5 @@ def total_annual_from_monthly_mean(ds, var='fw'):
     Uses `so.seconds_per_month()` to compute the number of seconds in each
     month, accounting for varying month lengths and leap years.
     """
-    ds['spm'] = (('time'), so.seconds_per_month(ds.groupby('time.year').mean().year.values))
+    ds['spm'] = (('time'), seconds_per_month(ds.groupby('time.year').mean().year.values))
     return (ds[var].fillna(0) * ds['spm']).sum(dim='time')
