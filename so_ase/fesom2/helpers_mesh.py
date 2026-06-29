@@ -3,6 +3,7 @@
 import xarray as xr
 import numpy as np
 import shapely.geometry as sh
+import shapely
 import math
 
 from scipy.spatial import cKDTree
@@ -538,6 +539,72 @@ def build_cavity_regional_mask(meshpath, kml_path, name='Filchner-Ronne', which=
                 mask_region[i] = False
 
     return mask_region
+
+def build_regional_mask(meshpath, kml_file, which='node', close_ring=True, polar='south'):
+    """
+    Builds a binary mask for FESOM nodes or elements based on a KML-defined polygon.
+    
+    Points/elements inside the polygon are marked True, outside are marked False.
+    The polygon can be non-closed in the KML file; it will be closed automatically
+    if close_ring=True.
+    
+    For polar regions (especially polygons wrapping around the pole or crossing the
+    antimeridian), the function projects coordinates to a stereographic projection
+    before performing the point-in-polygon test.
+    
+    Parameters:
+        meshpath (str): Path to the directory containing mesh files (nod2d.out, elem2d.out).
+        kml_file (str): Full path to the KML file containing the polygon definition.
+        which (str): 'node' to build mask for nodes, 'element' for element centroids.
+        close_ring (bool): If True, closes the polygon by appending the first coordinate
+                           at the end if not already closed. Default is True.
+        polar (str or None): 'south' for Antarctic stereographic projection,
+                             'north' for Arctic stereographic projection,
+                             None to use lon/lat directly (for non-polar regions).
+    
+    Returns:
+        array of bool: Boolean mask array. True if inside the polygon, False otherwise.
+                       Length equals number of nodes (if which='node') or elements (if which='element').
+    
+    Example:
+        >>> mask = build_regional_mask('/path/to/mesh/', '/path/to/AA_shelf.kml', which='node', polar='south')
+        >>> # mask[i] is True if node i is inside the polygon
+    """
+    if which == 'node':
+        lon, lat, node_idx, _ = read_nodes(meshpath)
+    elif which == 'element':
+        elements, lon, lat = read_elements(meshpath, return_coordinates=True)
+    else:
+        raise ValueError(f"which must be 'node' or 'element', got {which}")
+
+    coords = read_kml_coords(kml_file, close_ring=close_ring)
+    poly_lon = np.array([c[0] for c in coords])
+    poly_lat = np.array([c[1] for c in coords])
+
+    if polar is not None:
+        # Use stereographic projection to handle polar regions correctly
+        if polar == 'south':
+            proj = Proj(proj='stere', lat_0=-90, lon_0=0, ellps='WGS84')
+        elif polar == 'north':
+            proj = Proj(proj='stere', lat_0=90, lon_0=0, ellps='WGS84')
+        else:
+            raise ValueError(f"polar must be 'south', 'north', or None, got {polar}")
+        
+        # Transform polygon coordinates
+        poly_x, poly_y = proj(poly_lon, poly_lat)
+        polygon = sh.Polygon(zip(poly_x, poly_y))
+        
+        # Transform mesh coordinates
+        mesh_x, mesh_y = proj(lon, lat)
+        points = shapely.points(mesh_x, mesh_y)
+    else:
+        # Use lon/lat directly for non-polar regions
+        polygon = sh.Polygon(coords)
+        points = shapely.points(lon, lat)
+
+    mask = shapely.contains(polygon, points)
+
+    return mask
 
 def build_runoff_basin_mask(meshpath, runoff_maps_file, which='solid'):
     
