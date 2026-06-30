@@ -4,7 +4,7 @@ import xarray as xr
 import numpy as np
 from ..miscellaneous import seconds_per_month
 
-def total_annual_from_monthly_mean(ds, var='fw'):
+def total_annual_from_monthly_mean(ds, var='fw', how='sum'):
     """
     Convert monthly mean flux rates to total annual flux.
 
@@ -19,6 +19,10 @@ def total_annual_from_monthly_mean(ds, var='fw'):
         Time coordinates should be monthly.
     var : str, optional
         Name of the flux variable to convert. Default is 'fw'.
+    how : str, optional
+        How to aggregate the flux. Default is 'sum'.
+        'sum' will sum the flux over all months for each year (groupby('time.year').sum()).
+        'mean' will act like sum() but take the mean over all years (.groupby('time.year').sum().mean(dim='year')).
 
     Returns
     -------
@@ -32,7 +36,13 @@ def total_annual_from_monthly_mean(ds, var='fw'):
     month, accounting for varying month lengths and leap years.
     """
     ds['spm'] = (('time'), seconds_per_month(ds.groupby('time.year').mean().year.values))
-    return (ds[var].fillna(0) * ds['spm']).sum(dim='time')
+
+    if how == 'sum':
+        return (ds[var].fillna(0) * ds['spm']).groupby('time.year').sum()
+    elif how == 'mean':
+        return (ds[var].fillna(0) * ds['spm']).groupby('time.year').sum().mean(dim='year')
+    else:
+        raise ValueError(f"Invalid how parameter: {how}. Must be 'sum' or 'mean'.")
 
 def total_monthly_from_monthly_mean(ds, var='fw'):
     """
