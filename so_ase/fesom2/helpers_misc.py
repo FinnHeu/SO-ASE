@@ -1,0 +1,75 @@
+# so_ase/fesom2/helpers_misc.py
+
+import xarray as xr
+import numpy as np
+from ..miscellaneous import seconds_per_month
+
+def total_annual_from_monthly_mean(ds, var='fw', how='sum'):
+    """
+    Convert monthly mean flux rates to total annual flux.
+
+    Takes a dataset with monthly mean flux values (in units per second) and
+    computes the total annual flux by multiplying each month's value by the
+    number of seconds in that month, then summing over the time dimension.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Dataset containing the flux variable with a 'time' dimension.
+        Time coordinates should be monthly.
+    var : str, optional
+        Name of the flux variable to convert. Default is 'fw'.
+    how : str, optional
+        How to aggregate the flux. Default is 'sum'.
+        'sum' will sum the flux over all months for each year (groupby('time.year').sum()).
+        'mean' will act like sum() but take the mean over all years (.groupby('time.year').sum().mean(dim='year')).
+
+    Returns
+    -------
+    xarray.DataArray
+        Total annual flux summed over all months. NaN values in the input
+        are treated as zero before summation.
+
+    Notes
+    -----
+    Uses `so.seconds_per_month()` to compute the number of seconds in each
+    month, accounting for varying month lengths and leap years.
+    """
+    ds['spm'] = (('time'), seconds_per_month(ds.groupby('time.year').mean().year.values))
+
+    if how == 'sum':
+        return (ds[var].fillna(0) * ds['spm']).groupby('time.year').sum()
+    elif how == 'mean':
+        return (ds[var].fillna(0) * ds['spm']).groupby('time.year').sum().mean(dim='year')
+    else:
+        raise ValueError(f"Invalid how parameter: {how}. Must be 'sum' or 'mean'.")
+
+def total_monthly_from_monthly_mean(ds, var='fw'):
+    """
+    Convert monthly mean flux rates to total monthly flux.
+
+    Takes a dataset with monthly mean flux values (in units per second) and
+    computes the total monthly flux by multiplying each month's value by the
+    number of seconds in that month, then summing over the time dimension.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Dataset containing the flux variable with a 'time' dimension.
+        Time coordinates should be monthly.
+    var : str, optional
+        Name of the flux variable to convert. Default is 'fw'.
+
+    Returns
+    -------
+    xarray.DataArray
+        Total annual flux summed over all months. NaN values in the input
+        are treated as zero before summation.
+
+    Notes
+    -----
+    Uses `so.seconds_per_month()` to compute the number of seconds in each
+    month, accounting for varying month lengths and leap years.
+    """
+    ds['spm'] = (('time'), seconds_per_month(ds.groupby('time.year').mean().year.values))
+    return (ds[var].fillna(0) * ds['spm'])

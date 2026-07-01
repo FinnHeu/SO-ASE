@@ -65,7 +65,47 @@ def fesom2regular_1d(
     dumpfile=True,
 ):
     """
-    Nearest-neighbor interpolation from FESOM mesh to target grid.
+    Interpolate 1D FESOM data to a regular lat/lon grid using nearest-neighbor interpolation.
+
+    This function maps unstructured FESOM mesh data onto a regular grid by finding the
+    nearest mesh node for each target grid point. It supports caching of KDTree query
+    results (distances and indices) to speed up repeated interpolations on the same grid.
+
+    Parameters
+    ----------
+    data : array-like
+        1D array of values on FESOM mesh nodes to be interpolated.
+    mesh : fesom_mesh object
+        pyfesom mesh representation containing mesh geometry (x2, y2 coordinates).
+    lons : ndarray
+        2D array of target grid longitudes (e.g., from np.meshgrid).
+    lats : ndarray
+        2D array of target grid latitudes (e.g., from np.meshgrid).
+    distances_path : str, optional
+        Path to a cached distances file. If provided and exists, distances are loaded
+        from this file instead of being computed.
+    inds_path : str, optional
+        Path to a cached indices file. If provided and exists, indices are loaded
+        from this file instead of being computed.
+    radius_of_influence : float, optional
+        Maximum distance (in meters) for valid interpolation. Grid points farther
+        than this from any mesh node are set to NaN. Default is 100000 (100 km).
+    dumpfile : bool, optional
+        If True, cache computed distances and indices to disk for future use.
+        Default is True.
+
+    Returns
+    -------
+    np.ma.MaskedArray
+        2D masked array with shape matching `lons`/`lats`, containing interpolated
+        values. Points outside the radius of influence are masked.
+
+    Notes
+    -----
+    Cache files are searched in the following order:
+    1. User-specified path (distances_path/inds_path)
+    2. Mesh directory
+    3. PYFESOM_CACHE environment variable or ./MESH_cache
     """
 
     left, right = np.min(lons), np.max(lons)
@@ -168,6 +208,55 @@ def fesom2regular_nd(
     dumpfile=False,
     log=False
 ):
+    """
+    Batch interpolate FESOM output files to a regular lat/lon grid.
+
+    This function processes multiple years and variables of FESOM output, interpolating
+    each from the unstructured mesh to a user-defined regular grid. It handles both
+    2D (time, nodes) and 3D (time, depth, nodes) variables automatically.
+
+    Parameters
+    ----------
+    datapath : str
+        Path to directory containing FESOM output files. Files are expected to follow
+        the naming convention: `{variable}.fesom.{year}.nc`.
+    meshpath : str
+        Path to FESOM mesh directory containing mesh files and `fesom.mesh.diag.nc`.
+    reg_lat : tuple of float, optional
+        Latitude range (min, max) for the target grid. Default is (-90, 90).
+    reg_lon : tuple of float, optional
+        Longitude range (min, max) for the target grid. Default is (-180, 180).
+    lat_increment : float, optional
+        Latitude spacing of the target grid in degrees. Default is 1.
+    lon_increment : float, optional
+        Longitude spacing of the target grid in degrees. Default is 1.
+    variables : list of str, optional
+        List of variable names to interpolate. Default is ['temp'].
+    years : tuple of int, optional
+        Year range (start, end) inclusive to process. Default is (1850, 1860).
+    radius_of_influence : float, optional
+        Maximum distance (in meters) for valid interpolation. Default is 100000.
+    dest_path : str, optional
+        Output directory for interpolated NetCDF files. Default is './'.
+    dumpfile : bool, optional
+        If True, cache KDTree distances/indices for faster subsequent runs.
+        Default is False.
+    log : bool, optional
+        If True, print progress messages. Default is False.
+
+    Returns
+    -------
+    None
+        Interpolated data is written to NetCDF files at `dest_path` with naming
+        convention: `{variable}.interp.fesom.{year}.nc`.
+
+    Notes
+    -----
+    - Existing output files are skipped (not overwritten).
+    - 2D variables produce output with dimensions (lat, lon, time).
+    - 3D variables produce output with dimensions (lat, lon, nz1, time).
+    - Vertical levels are taken from the mesh diagnostic file.
+    """
 
     mesh = pf.load_mesh(meshpath, usepickle=False)
     mesh_diag = xr.open_dataset(f"{meshpath}fesom.mesh.diag.nc")
@@ -272,4 +361,132 @@ def fesom2regular_nd(
             if log:
                 print(f"Saved to {output_file}")
 
-            
+
+def fesom2regular_binned(
+    data,
+    meshpath,
+    which='node',
+    reg_lon=(-180, 180),
+    reg_lat=(-90, 90),
+    lon_increment=1.0,
+    lat_increment=1.0,
+):
+    """
+    Regrid FESOM data to a regular lon/lat grid using area-weighted binning.
+
+    For each grid cell, finds all FESOM nodes/elements whose coordinates fall
+    within the cell, computes the area-weighted mean of their values, and
+    returns the result on the regular grid.
+
+    Parameters
+    ----------
+    data : array-like
+        1D array of values on FESOM mesh nodes or elements.
+    meshpath : str
+        Path to the directory containing `fesom.mesh.diag.nc`.
+    which : str, optional
+        'node' for node-based data (uses nod_area), 'element' for element-based
+        data (uses elem_area). Default is 'node'.
+    reg_lon : tuple of float, optional
+        Longitude range (min, max) for the target grid. Default is (-180, 180).
+    reg_lat : tuple of float, optional
+        Latitude range (min, max) for the target grid. Default is (-90, 90).
+    lon_increment : float, optional
+        Longitude spacing of the target grid in degrees. Default is 1.0.
+    lat_increment : float, optional
+        Latitude spacing of the target grid in degrees. Default is 1.0.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with the binned variable 'data' on dimensions (lat, lon).
+        Grid cells with no data are set to NaN.
+
+    Example
+    -------
+    >>> binned = fesom2regular_binned(
+    ...     ds['temp'].isel(time=0, nz1=0).values,
+    ...     '/path/to/mesh/',
+    ...     which='node',
+    ...     reg_lon=(-180, 180),
+    ...     reg_lat=(-90, -60),
+    ...     lon_increment=0.5,
+    ...     lat_increment=0.5
+    ... )
+    """
+    data = np.asarray(data)
+
+    # Load mesh diagnostics
+    mesh_diag = xr.open_dataset(f"{meshpath}fesom.mesh.diag.nc")
+
+    if which == 'node':
+        lon = mesh_diag.lon.values
+        lat = mesh_diag.lat.values
+        area = mesh_diag.nod_area.max(dim='nz').values
+    elif which == 'element':
+        lon = mesh_diag.elem_lon.values
+        lat = mesh_diag.elem_lat.values
+        area = mesh_diag.elem_area.values
+    else:
+        mesh_diag.close()
+        raise ValueError(f"which must be 'node' or 'element', got {which}")
+
+    mesh_diag.close()
+
+    # Define grid edges
+    lon_edges = np.arange(reg_lon[0], reg_lon[1] + lon_increment, lon_increment)
+    lat_edges = np.arange(reg_lat[0], reg_lat[1] + lat_increment, lat_increment)
+    
+    # Grid cell centers
+    lon_centers = (lon_edges[:-1] + lon_edges[1:]) / 2
+    lat_centers = (lat_edges[:-1] + lat_edges[1:]) / 2
+    
+    nlat = len(lat_centers)
+    nlon = len(lon_centers)
+
+    # Compute bin indices for each point
+    lon_idx = np.digitize(lon, lon_edges) - 1
+    lat_idx = np.digitize(lat, lat_edges) - 1
+
+    # Mask points outside the grid
+    valid = (
+        (lon_idx >= 0) & (lon_idx < nlon) &
+        (lat_idx >= 0) & (lat_idx < nlat) &
+        np.isfinite(data)
+    )
+
+    # Compute linear bin index for valid points
+    bin_idx = lat_idx[valid] * nlon + lon_idx[valid]
+    data_valid = data[valid]
+    area_valid = area[valid]
+
+    # Weighted sum and total area per bin
+    weighted_sum = np.bincount(bin_idx, weights=data_valid * area_valid, minlength=nlat * nlon)
+    total_area = np.bincount(bin_idx, weights=area_valid, minlength=nlat * nlon)
+
+    # Compute area-weighted mean
+    with np.errstate(divide='ignore', invalid='ignore'):
+        binned = weighted_sum / total_area
+    binned[total_area == 0] = np.nan
+
+    # Reshape to 2D grid
+    binned = binned.reshape((nlat, nlon))
+
+    # Create xarray Dataset
+    ds_out = xr.Dataset(
+        data_vars={
+            'data': (['lat', 'lon'], binned.astype(np.float32)),
+            'cell_area': (['lat', 'lon'], total_area.reshape((nlat, nlon)).astype(np.float32)),
+        },
+        coords={
+            'lon': lon_centers,
+            'lat': lat_centers,
+        },
+        attrs={
+            'description': 'Area-weighted binned FESOM data on regular grid',
+            'lon_increment': lon_increment,
+            'lat_increment': lat_increment,
+        }
+    )
+
+    return ds_out

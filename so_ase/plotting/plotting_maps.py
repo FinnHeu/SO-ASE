@@ -93,10 +93,10 @@ def create_map(
     gl = ax.gridlines(
         crs=ccrs.PlateCarree(),
         draw_labels=tick_labels,
-        linewidth=1,
-        color="gray",
+        linewidth=.75,
+        color="lightgrey",
         alpha=0.5,
-        linestyle="--",
+        linestyle=":",
         x_inline=False,
         y_inline=True,
         zorder=zorder + 1,

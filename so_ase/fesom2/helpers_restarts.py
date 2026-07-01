@@ -357,6 +357,225 @@ def fill_cavities_from_existing_restart(varname, path_restart_src, path_restart_
 
 ###--------> 2. FESOM iceberg restart files
 
+def validate_icbdat_files(icbpath, meshpath, verbose=True):
+    """
+    Validate existing icb*.dat files against a FESOM mesh and remove invalid icebergs.
+    
+    Checks each iceberg location to ensure it is in a valid open ocean element:
+    - Not in a cavity element
+    - Not in a calving front element
+    - Not in a seeding element (near calving front)
+    - Not near coastal or cavity nodes
+    
+    Original files are renamed with '_uncorrected' suffix before writing corrected files.
+    
+    Parameters
+    ----------
+    icbpath : str
+        Path to the directory containing icb_*.dat files.
+    meshpath : str
+        Path to the mesh directory containing nod2d.out, elem2d.out, cavity_elvls.out,
+        and optionally elem_icb_seeding.npz cache file.
+    verbose : bool, optional
+        Whether to print progress information, by default True.
+    
+    Returns
+    -------
+    xarray.Dataset
+        Dataset containing the validated iceberg data.
+    
+    Notes
+    -----
+    Modifies the following files in icbpath:
+        - Renames original icb_*.dat files to icb_*_uncorrected.dat
+        - Writes new icb_*.dat files containing only valid icebergs
+    """
+    from .eval_icebergs import read_iceberg_initial_files
+    import shutil
+    
+    if verbose:
+        print('============ validate_icbdat_files ==============')
+        print(f'Source: {icbpath}')
+        print(f'Mesh: {meshpath}')
+    
+    # Read the icb*.dat files
+    ds_icb = read_iceberg_initial_files(icbpath)
+    
+    n_icebergs = len(ds_icb.ib)
+    if verbose:
+        print(f'Number of icebergs in icb*.dat files: {n_icebergs}')
+    
+    # Read mesh data
+    if verbose:
+        print('Checking iceberg locations on mesh...')
+    
+    node_lon, node_lat, node_idx, node_coast = read_nodes(meshpath)
+    elements = read_elements(meshpath)
+    cavity_elvls = read_element_levels(meshpath, which='cavity', raw=False, python_indexing=False)
+    
+    # Build node cavity mask (node is cavity if all its elements are cavity)
+    node_cavity_mask = build_cavity_mask(meshpath, which='node')
+    
+    # Load forbidden elements from cache file if available
+    cache_file = os.path.join(meshpath, "elem_icb_seeding.npz")
+    forbidden_elems = set()
+    if os.path.exists(cache_file):
+        if verbose:
+            print(f'  Loading seeding constraints from: {cache_file}')
+        cache_data = np.load(cache_file, allow_pickle=True)
+        # Calving front elements are forbidden
+        calving_front_elems = set(cache_data['all_calving_front'])
+        # Seeding elements (near calving front) are also forbidden
+        seeding_elems = set(cache_data['all_seeding_elems'])
+        # Combine both into forbidden set
+        forbidden_elems = calving_front_elems | seeding_elems
+        if verbose:
+            print(f'  Calving front elements: {len(calving_front_elems)}')
+            print(f'  Seeding elements (near calving front): {len(seeding_elems)}')
+            print(f'  Total forbidden elements: {len(forbidden_elems)}')
+    else:
+        if verbose:
+            print(f'  Warning: Cache file not found: {cache_file}')
+            print(f'  Skipping forbidden element check.')
+    
+    # Find element for each iceberg
+    elem_indices = find_element_for_points(
+        ds_icb['lon_deg'].values,
+        ds_icb['lat_deg'].values,
+        node_lon, node_lat, elements
+    )
+    
+    # Check validity of each iceberg location
+    valid_mask = np.ones(n_icebergs, dtype=bool)
+    n_not_in_elem = 0
+    n_in_cavity = 0
+    n_near_coast_cavity = 0
+    n_in_forbidden = 0
+    
+    for i in range(n_icebergs):
+        eidx = elem_indices[i]
+        
+        # Check if iceberg is in any element
+        if eidx == -1:
+            valid_mask[i] = False
+            n_not_in_elem += 1
+            continue
+        
+        # Check if element is not a cavity element (cavity_elvls == 1 means open ocean)
+        if cavity_elvls[eidx] > 1:
+            valid_mask[i] = False
+            n_in_cavity += 1
+            continue
+        
+        # Check if all three nodes are valid (not coastal and not cavity)
+        n1, n2, n3 = elements[eidx]
+        node_invalid = False
+        for node in [n1, n2, n3]:
+            # Check if node is coastal
+            if node_coast[node] == 1:
+                node_invalid = True
+                break
+            # Check if node is in cavity
+            if node_cavity_mask[node]:
+                node_invalid = True
+                break
+        if node_invalid:
+            valid_mask[i] = False
+            n_near_coast_cavity += 1
+            continue
+        
+        # Check if element is in forbidden elements (calving front or seeding elements)
+        if eidx in forbidden_elems:
+            valid_mask[i] = False
+            n_in_forbidden += 1
+            continue
+    
+    # Filter dataset to valid icebergs
+    n_valid = valid_mask.sum()
+    
+    if verbose:
+        print(f'  Icebergs not in any element: {n_not_in_elem}')
+        print(f'  Icebergs in cavity elements: {n_in_cavity}')
+        print(f'  Icebergs near coast/cavity nodes: {n_near_coast_cavity}')
+        print(f'  Icebergs in forbidden elements (calving front + seeding): {n_in_forbidden}')
+        print(f'  Valid icebergs (pure open ocean): {n_valid} / {n_icebergs}')
+    
+    # Apply filter
+    ds_icb_valid = ds_icb.isel(ib=valid_mask)
+    
+    # Rename original files with _uncorrected suffix
+    dat_files = [
+        'icb_longitude.dat',
+        'icb_latitude.dat',
+        'icb_height.dat',
+        'icb_length.dat',
+        'icb_scaling.dat',
+        'icb_calving_day.dat'
+    ]
+    
+    if verbose:
+        print('Renaming original files with _uncorrected suffix...')
+    
+    for dat_file in dat_files:
+        src_file = os.path.join(icbpath, dat_file)
+        if os.path.exists(src_file):
+            dst_file = os.path.join(icbpath, dat_file.replace('.dat', '_uncorrected.dat'))
+            shutil.move(src_file, dst_file)
+            if verbose:
+                print(f'  {dat_file} -> {dat_file.replace(".dat", "_uncorrected.dat")}')
+    
+    # Write corrected icb*.dat files
+    if verbose:
+        print('Writing corrected icb*.dat files...')
+    
+    # Write icb_longitude.dat
+    with open(f'{icbpath}/icb_longitude.dat', 'w') as f:
+        for val in ds_icb_valid['lon_deg'].values:
+            f.write(f'{val}\n')
+    if verbose:
+        print(f'  Written: icb_longitude.dat')
+    
+    # Write icb_latitude.dat
+    with open(f'{icbpath}/icb_latitude.dat', 'w') as f:
+        for val in ds_icb_valid['lat_deg'].values:
+            f.write(f'{val}\n')
+    if verbose:
+        print(f'  Written: icb_latitude.dat')
+    
+    # Write icb_height.dat
+    with open(f'{icbpath}/icb_height.dat', 'w') as f:
+        for val in ds_icb_valid['height_ib'].values:
+            f.write(f'{val}\n')
+    if verbose:
+        print(f'  Written: icb_height.dat')
+    
+    # Write icb_length.dat
+    with open(f'{icbpath}/icb_length.dat', 'w') as f:
+        for val in ds_icb_valid['length_ib'].values:
+            f.write(f'{val}\n')
+    if verbose:
+        print(f'  Written: icb_length.dat')
+    
+    # Write icb_scaling.dat
+    with open(f'{icbpath}/icb_scaling.dat', 'w') as f:
+        for val in ds_icb_valid['scaling'].values:
+            f.write(f'{int(val)}\n')
+    if verbose:
+        print(f'  Written: icb_scaling.dat')
+    
+    # Write icb_calving_day.dat
+    with open(f'{icbpath}/icb_calving_day.dat', 'w') as f:
+        for val in ds_icb_valid['calving_day'].values:
+            f.write(f'{int(val)}\n')
+    if verbose:
+        print(f'  Written: icb_calving_day.dat')
+    
+    if verbose:
+        print('Done.')
+    
+    return 
+
+
 def icbdat_from_ismrestart(srcpath, dstpath, meshpath=None, verbose=True):
     """
     Convert an iceberg.restart.ISM file into a set of corresponding initial icb_*.dat files.
