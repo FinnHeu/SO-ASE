@@ -37,7 +37,7 @@ import so_ase as so
 
 # Ocean processing
 DO_EXTRACT_BOTTOM_TEMP = True
-DO_EXTRACT_BOTTOM_SALT = True
+DO_EXTRACT_BOTTOM_SALT = False
 DO_EXTRACT_BOTTOM_SIGMA0 = False
 DO_DEPTH_AVG_TEMP_0_50 = True
 DO_DEPTH_AVG_TEMP_50_500 = True
@@ -137,6 +137,7 @@ CAVITY_MASKS = [
     {'name': 'AmeryIceShelf', 'kml_path': KML_PATH},
     {'name': 'WestIndianOcean', 'kml_path': KML_PATH},
     {'name': 'EastIndianOcean', 'kml_path': KML_PATH},
+    {'name': 'FilchnerRonneIceShelf', 'kml_path': KML_PATH},
     {'name': 'RossSea', 'kml_path': KML_PATH},
     {'name': 'AmundsenSea', 'kml_path': KML_PATH},
     {'name': 'BellingshausenSea', 'kml_path': KML_PATH},

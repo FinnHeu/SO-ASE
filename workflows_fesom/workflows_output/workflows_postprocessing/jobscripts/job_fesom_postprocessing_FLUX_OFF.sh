@@ -3,8 +3,7 @@
 #SBATCH --partition=compute
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --mem=0
-#SBATCH --exclusive
+#SBATCH --mem=20GB
 #SBATCH --time=00:30:00
 #SBATCH --account=ab0995
 #SBATCH --output=logs/postprocessing/cav_icb/postproc_%a.out

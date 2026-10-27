@@ -7,8 +7,8 @@
 #SBATCH --exclusive
 #SBATCH --time=00:25:00
 #SBATCH --account=ab0995
-#SBATCH --output=logs/postprocessing/cav_icb/postproc_%a.out
-#SBATCH --error=logs/postprocessing/cav_icb/postproc_%a.err
+#SBATCH --output=logs/postprocessing/CMIP-PICTRL/postproc_%a.out
+#SBATCH --error=logs/postprocessing/CMIP-PICTRL/postproc_%a.err
 
 # ============================================================================
 #                    FESOM2 Postprocessing Job Script
@@ -33,10 +33,10 @@ YEAR_START=1850
 CONDA_ENV="/home/a/a270186/.conda/envs/so_ase/"
 
 # Python script path
-PYTHON_SCRIPT="/home/a/a270186/python_modules/SO-ASE/workflows_fesom/workflows_output/workflows_postprocessing/python/fesom_postprocessing_cavicb.py"
+PYTHON_SCRIPT="/home/a/a270186/python_modules/SO-ASE/workflows_fesom/workflows_output/workflows_postprocessing/python/fesom_postprocessing_CMIP7_PICTRL.py"
 
 # Log directory
-LOG_DIR="./logs/postprocessing/"
+LOG_DIR="./logs/postprocessing/CMIP-PICTRL/"
 
 # ============================================================================
 #                         SETUP

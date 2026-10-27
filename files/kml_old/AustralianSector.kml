@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document>
+	<name>EasternAntarctica.kml</name>
+	<Style id="inline">
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>2</width>
+		</LineStyle>
+		<PolyStyle>
+			<fill>0</fill>
+		</PolyStyle>
+	</Style>
+	<Style id="inline0">
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>2</width>
+		</LineStyle>
+		<PolyStyle>
+			<fill>0</fill>
+		</PolyStyle>
+	</Style>
+	<StyleMap id="inline1">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#inline</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#inline0</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Placemark>
+		<name>path</name>
+		<styleUrl>#inline1</styleUrl>
+		<LineString>
+			<tessellate>1</tessellate>
+			<coordinates>
+				77.06279402705503,-69.84681432552485,0 77.02959455588233,-67.5711891688822,0 82.38922896508458,-63.776662414028,0 99.03001197856958,-59.86528671078341,0 113.604138164201,-59.79179117978984,0 130.8601395048875,-60.19746937725316,0 145.7833547545405,-60.36610075134293,0 157.5671745875883,-62.81339280660685,0 169.0248105341158,-67.33179733387473,0 175.1936295334828,-70.76945073994726,0 172.79355256763,-74.36949754400709,0 169.3168572739888,-75.99453482728866,0 167.3688964434475,-76.48100043728088,0 158.7504695616863,-77.20667319483839,0 145.7739639209611,-76.66321373670654,0 124.7062529829543,-74.15149325502068,0 101.3617988100495,-72.01389704577603,0 88.01148563163105,-70.95311708199577,0 77.76214658240011,-70.53981787513061,0 
+			</coordinates>
+		</LineString>
+		<atom:link rel="app" href="https://www.google.com/earth/about/versions/#earth-pro" title="Google Earth Pro 7.3.6.10441"></atom:link>
+	</Placemark>
+</Document>
+</kml>

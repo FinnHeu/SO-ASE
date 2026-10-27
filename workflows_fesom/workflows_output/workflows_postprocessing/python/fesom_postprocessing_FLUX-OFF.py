@@ -136,6 +136,7 @@ CAVITY_MASKS = [
     {'name': 'all'},  # All cavities combined
     {'name': 'AmeryIceShelf', 'kml_path': KML_PATH},
     {'name': 'WestIndianOcean', 'kml_path': KML_PATH},
+    {'name': 'FilchnerRonneIceShelf', 'kml_path': KML_PATH},
     {'name': 'EastIndianOcean', 'kml_path': KML_PATH},
     {'name': 'RossSea', 'kml_path': KML_PATH},
     {'name': 'AmundsenSea', 'kml_path': KML_PATH},

@@ -35,13 +35,13 @@ import so_ase as so
 # Set to True to enable, False to disable each processing step
 
 # Ocean processing
-DO_EXTRACT_BOTTOM_TEMP = True
-DO_EXTRACT_BOTTOM_SALT = True
+DO_EXTRACT_BOTTOM_TEMP = False
+DO_EXTRACT_BOTTOM_SALT = False
 DO_EXTRACT_BOTTOM_SIGMA0 = False
-DO_DEPTH_AVG_TEMP_0_50 = True
-DO_DEPTH_AVG_TEMP_50_500 = True
-DO_DEPTH_AVG_SALT_0_50 = True
-DO_DEPTH_AVG_SALT_50_500 = True
+DO_DEPTH_AVG_TEMP_0_50 = False
+DO_DEPTH_AVG_TEMP_50_500 = False
+DO_DEPTH_AVG_SALT_0_50 = False
+DO_DEPTH_AVG_SALT_50_500 = False
 DO_TOTAL_KINETIC_ENERGY = False
 DO_DEPTH_EXTRACT = [
     {'varname': 'temp', 'depth': 5},

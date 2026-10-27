@@ -91,12 +91,12 @@ DO_REGION_MEAN_PROFILE = [
 # ============================================================================
 
 # Input paths
-SRC_PATH_FESOM = "/work/ba1550/a270186/simulations/awiesm3-v3.4.2-CAV-ICB/production/CAV-ICB-PICTRL/outdata/fesom/"  # FESOM output files
+SRC_PATH_FESOM = "/work/ba1550/a270186/simulations/awiesm3-v3.4.2-CAV-ICB/production/CAV-ICB-PICTRL-ICB-FLUX-OFF/outdata/fesom/"  # FESOM output files
 MESH_PATH = "/work/ab0995/a270186/model_inputs/fesom2/mesh/DARS2cav/"  # Mesh files
 MESH_DIAG_PATH = MESH_PATH  # fesom.mesh.diag.nc
 
 # Output paths
-DEST_PATH_BASE = "/work/ba1550/a270186/simulations/awiesm3-v3.4.2-CAV-ICB/production/CAV-ICB-PICTRL/analysis/fesom/"
+DEST_PATH_BASE = "/work/ba1550/a270186/simulations/awiesm3-v3.4.2-CAV-ICB/production/CAV-ICB-PICTRL-ICB-FLUX-OFF/analysis/fesom/"
 DEST_PATH_BOTTOM = DEST_PATH_BASE + "bottom_fields/"
 DEST_PATH_KE = DEST_PATH_BASE + "kinetic_energy/"
 DEST_PATH_SUBSHELF = DEST_PATH_BASE + "subshelf/"
@@ -136,6 +136,7 @@ CAVITY_MASKS = [
     {'name': 'all'},  # All cavities combined
     {'name': 'AmeryIceShelf', 'kml_path': KML_PATH},
     {'name': 'WestIndianOcean', 'kml_path': KML_PATH},
+    {'name': 'FilchnerRonneIceShelf', 'kml_path': KML_PATH},
     {'name': 'EastIndianOcean', 'kml_path': KML_PATH},
     {'name': 'RossSea', 'kml_path': KML_PATH},
     {'name': 'AmundsenSea', 'kml_path': KML_PATH},

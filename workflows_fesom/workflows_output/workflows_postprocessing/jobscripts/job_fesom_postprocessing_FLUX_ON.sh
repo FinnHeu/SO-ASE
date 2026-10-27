@@ -3,12 +3,11 @@
 #SBATCH --partition=compute
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --mem=0
-#SBATCH --exclusive
-#SBATCH --time=00:25:00
+#SBATCH --mem=40GB
+#SBATCH --time=00:35:00
 #SBATCH --account=ab0995
-#SBATCH --output=logs/postprocessing/cav_icb/postproc_%a.out
-#SBATCH --error=logs/postprocessing/cav_icb/postproc_%a.err
+#SBATCH --output=./logs/postprocessing/FLUX-ON/postproc_%a.out
+#SBATCH --error=logs/postprocessing/FLUX-ON/postproc_%a.err
 
 # ============================================================================
 #                    FESOM2 Postprocessing Job Script
