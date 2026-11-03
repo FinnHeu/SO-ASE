@@ -384,7 +384,8 @@ def find_nodes_in_box(
     Finds node indices within a specified geographical box.
     Parameters:
         mesh_diag_path (str): Path to the directory containing `fesom.mesh.diag.nc`.
-        box (list): List of [lon_min, lon_max, lat_min, lat_max].
+        box (list): List of [lon_min, lon_max, lat_min, lat_max]. Longitudes may wrap across the
+            antimeridian, e.g. [170, 220] or [170, -140] both select 170E to 140W.
         log (bool): If True, prints the number of found nodes.
     Returns:
         array: Array of node indices within the specified box.
@@ -392,9 +393,11 @@ def find_nodes_in_box(
     mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
     
     # Find indices of nodes within the specified box
+    dlon = (mesh_diag.lon - box[0]) % 360
+    lon_span = (box[1] - box[0]) % 360 or 360
     inds = np.where(
-        (mesh_diag.lon > box[0])
-        & (mesh_diag.lon < box[1])
+        (dlon > 0)
+        & (dlon < lon_span)
         & (mesh_diag.lat > box[2])
         & (mesh_diag.lat < box[3])
     )[0]

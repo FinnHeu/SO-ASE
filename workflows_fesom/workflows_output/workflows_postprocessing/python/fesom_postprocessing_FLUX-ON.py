@@ -23,6 +23,7 @@ Dependencies:
 import sys
 import os
 import numpy as np
+import xarray as xr
 
 # Add parent directory to path if needed
 sys.path.insert(0, os.path.expanduser("~/python_modules/SO-ASE"))
@@ -37,26 +38,10 @@ import so_ase as so
 # Ocean processing
 DO_EXTRACT_BOTTOM_TEMP = True
 DO_EXTRACT_BOTTOM_SALT = True
-DO_EXTRACT_BOTTOM_SIGMA0 = False
-DO_DEPTH_AVG_TEMP_0_50 = True
-DO_DEPTH_AVG_TEMP_50_500 = True
-DO_DEPTH_AVG_SALT_0_50 = True
-DO_DEPTH_AVG_SALT_50_500 = True
+DO_EXTRACT_BOTTOM_SIGMA0 = True
+DO_DEPTH_AVG = True
 DO_TOTAL_KINETIC_ENERGY = False
-DO_DEPTH_EXTRACT = [
-    {'varname': 'temp', 'depth': 5},
-    {'varname': 'temp', 'depth': 50},
-    {'varname': 'temp', 'depth': 250},
-    {'varname': 'temp', 'depth': 500},
-    {'varname': 'temp', 'depth': 1000},
-    {'varname': 'temp', 'depth': 4000},
-    {'varname': 'salt', 'depth': 5},
-    {'varname': 'salt', 'depth': 50},
-    {'varname': 'salt', 'depth': 250},
-    {'varname': 'salt', 'depth': 500},
-    {'varname': 'salt', 'depth': 1000},
-    {'varname': 'salt', 'depth': 4000},
-]
+DO_DEPTH_EXTRACT = True
 
 # Cavity/ice shelf processing
 DO_SUBSHELF_FRESHWATERFLUX = True
@@ -69,6 +54,10 @@ DO_SUBSHELF_HYDROGRAPHY_SALT = False
 # Iceberg processing
 DO_ICEBERG_HEATFLUX = True
 DO_ICEBERG_VOLUME = True
+DO_ICEBERG_COMBINE_FW = True
+DO_ICEBERG_INTEGRATED_FLUXES = True
+DO_ICEBERG_FLUX_TO_GTY = True
+DO_ICEBERG_FLUX_TO_GTM = True
 
 # Sea ice processing
 DO_SEA_ICE_AREA = True
@@ -78,7 +67,9 @@ DO_SEA_ICE_EXTENT = True
 # Region mean vertical profiles
 DO_REGION_MEAN_PROFILE = [
     {'varname': 'temp'}, 
-    {'varname': 'salt'}
+    {'varname': 'salt'},
+    {'varname': 'dens_sigma0'},
+    {'varname': 'dens_insitu'}
     ]  # Set to False to disable
 
 # ============================================================================
@@ -86,12 +77,12 @@ DO_REGION_MEAN_PROFILE = [
 # ============================================================================
 
 # Input paths
-SRC_PATH_FESOM = "/work/ba1550/a270186/simulations/awiesm3-v3.4.2-CAV-ICB/production/CAV-ICB-PICTRL/outdata/fesom/"  # FESOM output files
+SRC_PATH_FESOM = "/work/ba1550/a270186/simulations/awiesm3-v3.4.2-CAV-ICB/production/CAV-ICB-PICTRL-FLUX-ON/outdata/fesom/"  # FESOM output files
 MESH_PATH = "/work/ab0995/a270186/model_inputs/fesom2/mesh/DARS2cav/"  # Mesh files
 MESH_DIAG_PATH = MESH_PATH  # fesom.mesh.diag.nc
 
 # Output paths
-DEST_PATH_BASE = "/work/ba1550/a270186/simulations/awiesm3-v3.4.2-CAV-ICB/production/CAV-ICB-PICTRL/analysis/fesom/"
+DEST_PATH_BASE = "/work/ba1550/a270186/simulations/awiesm3-v3.4.2-CAV-ICB/production/CAV-ICB-PICTRL-FLUX-ON/analysis/fesom/"
 DEST_PATH_BOTTOM = DEST_PATH_BASE + "bottom_fields/"
 DEST_PATH_KE = DEST_PATH_BASE + "kinetic_energy/"
 DEST_PATH_SUBSHELF = DEST_PATH_BASE + "subshelf/"
@@ -102,6 +93,8 @@ DEST_PATH_SEA_ICE = DEST_PATH_BASE + "sea_ice/"
 DEST_PATH_DEPTH_AVG = DEST_PATH_BASE + "depth_averages/"
 DEST_PATH_DEPTH_EXTRACT = DEST_PATH_BASE + "depth_extracts/"
 DEST_PATH_ICEBERG = DEST_PATH_BASE + "iceberg/"
+DEST_PATH_ICEBERG_GTY = DEST_PATH_BASE + "iceberg_gty/"
+DEST_PATH_ICEBERG_GTM = DEST_PATH_BASE + "iceberg_gtm/"
 DEST_PATH_REGION_AVG = DEST_PATH_BASE + "region_averages/"
 
 # Mask files for region averaging (list of mask file paths)
@@ -116,25 +109,40 @@ KML_PATH = os.path.expanduser("~/python_modules/SO-ASE/files/kml/")
 #                         PROCESSING PARAMETERS
 # ============================================================================
 
+DEPTH_EXTRACT = {'varnames': ['temp', 'salt', 'dens_sigma0'], 'depths': [5, 50, 250, 500, 1000, 4000]}
+
+DEPTH_AVG = {'varnames': ['temp', 'salt'], 'depth_ceil': [0, 50], 'depth_floor': [50, 500]}
+
 # Sea ice parameters
-SEA_ICE_BOX_SO = [-180, 180, -90, -45]  # [lon_min, lon_max, lat_min, lat_max]
-SEA_ICE_BOX_ARCTIC = [-180, 180, 45, 90]  # [lon_min, lon_max, lat_min, lat_max]
-SEA_ICE_BOX_ARCMED = [-40, 100, 40, 80]  # [lon_min, lon_max, lat_min, lat_max]
-SICONC_THRESHOLD = 0.15
+SEA_ICE_BOX_SO = {"box": [-180, 180, -90, -45], "name": "SouthernOcean"}  # [lon_min, lon_max, lat_min, lat_max]
+SEA_ICE_BOX_WeddellSea = {"box": [-65, 0, -90, -45], "name": "WeddellSea"}
+SEA_ICE_BOX_WestIndianOcean = {"box": [0, 90, -90, -45], "name": "WestIndianOcean"}
+SEA_ICE_BOX_EastIndianOcean = {"box": [90, 170, -90, -45], "name": "EastIndianOcean"}
+SEA_ICE_BOX_RossSea = {"box": [170, 220, -90, -45], "name": "RossSea"}
+SEA_ICE_BOX_AmundsenBellingshausenSea = {"box": [-140, -65, -90, -45], "name": "AmundsenBellingshausenSea"}
+
+SEA_ICE_BOXES = [
+    SEA_ICE_BOX_SO,
+    SEA_ICE_BOX_WeddellSea,
+    SEA_ICE_BOX_WestIndianOcean,
+    SEA_ICE_BOX_EastIndianOcean,
+    SEA_ICE_BOX_RossSea,
+    SEA_ICE_BOX_AmundsenBellingshausenSea,
+]
 
 # Cavity mask configuration
 # List of all cavity masks to process (set to empty list [] to skip regional processing)
 # Note: kml_path should be the directory, not the full file path (filename is built from name)
 CAVITY_MASKS = [
     {'name': 'all'},  # All cavities combined
-    {'name': 'Amery', 'kml_path': KML_PATH},
-    {'name': 'Amundsen', 'kml_path': KML_PATH},
-    {'name': 'AustralianSector', 'kml_path': KML_PATH},
-    {'name': 'Bellingshausen', 'kml_path': KML_PATH},
-    {'name': 'EasternWeddell', 'kml_path': KML_PATH},
-    {'name': 'FilchnerRonne', 'kml_path': KML_PATH},
-    {'name': 'Larsen', 'kml_path': KML_PATH},
-    {'name': 'Ross', 'kml_path': KML_PATH},
+    {'name': 'AmeryIceShelf', 'kml_path': KML_PATH},
+    {'name': 'WestIndianOcean', 'kml_path': KML_PATH},
+    {'name': 'EastIndianOcean', 'kml_path': KML_PATH},
+    {'name': 'FilchnerRonneIceShelf', 'kml_path': KML_PATH},
+    {'name': 'RossSea', 'kml_path': KML_PATH},
+    {'name': 'AmundsenSea', 'kml_path': KML_PATH},
+    {'name': 'BellingshausenSea', 'kml_path': KML_PATH},
+    {'name': 'WeddellSea', 'kml_path': KML_PATH}  
 ]
 
 # Kinetic energy mask ('all', 'cavity', 'open_ocean')
@@ -165,7 +173,8 @@ def run_postprocessing(year):
     for path in [DEST_PATH_BOTTOM, DEST_PATH_KE, DEST_PATH_SUBSHELF,
                  DEST_PATH_SUBSHELF_GTY, DEST_PATH_SUBSHELF_GTM,
                  DEST_PATH_SUBSHELF_HYDRO, DEST_PATH_SEA_ICE, DEST_PATH_DEPTH_AVG,
-                 DEST_PATH_DEPTH_EXTRACT, DEST_PATH_ICEBERG, DEST_PATH_REGION_AVG]:
+                 DEST_PATH_DEPTH_EXTRACT, DEST_PATH_ICEBERG, DEST_PATH_REGION_AVG,
+                 DEST_PATH_ICEBERG_GTY, DEST_PATH_ICEBERG_GTM]:
         os.makedirs(path, exist_ok=True)
     
     years = (year, year)  # Process single year
@@ -204,53 +213,19 @@ def run_postprocessing(year):
             log=LOG
         )
     
-    if DO_DEPTH_AVG_TEMP_0_50:
-        print("\n>>> Computing depth-averaged temperature (0-50m)...")
-        so.fesom_depth_average(
-            src_path=SRC_PATH_FESOM,
-            dest_path=DEST_PATH_DEPTH_AVG,
-            mesh_diag_path=MESH_DIAG_PATH,
-            varname='temp',
-            depth_range=(0, 50),
-            years=years,
-            log=LOG
-        )
-    
-    if DO_DEPTH_AVG_TEMP_50_500:
-        print("\n>>> Computing depth-averaged temperature (50-500m)...")
-        so.fesom_depth_average(
-            src_path=SRC_PATH_FESOM,
-            dest_path=DEST_PATH_DEPTH_AVG,
-            mesh_diag_path=MESH_DIAG_PATH,
-            varname='temp',
-            depth_range=(50, 500),
-            years=years,
-            log=LOG
-        )
-    
-    if DO_DEPTH_AVG_SALT_0_50:
-        print("\n>>> Computing depth-averaged salinity (0-50m)...")
-        so.fesom_depth_average(
-            src_path=SRC_PATH_FESOM,
-            dest_path=DEST_PATH_DEPTH_AVG,
-            mesh_diag_path=MESH_DIAG_PATH,
-            varname='salt',
-            depth_range=(0, 50),
-            years=years,
-            log=LOG
-        )
-    
-    if DO_DEPTH_AVG_SALT_50_500:
-        print("\n>>> Computing depth-averaged salinity (50-500m)...")
-        so.fesom_depth_average(
-            src_path=SRC_PATH_FESOM,
-            dest_path=DEST_PATH_DEPTH_AVG,
-            mesh_diag_path=MESH_DIAG_PATH,
-            varname='salt',
-            depth_range=(50, 500),
-            years=years,
-            log=LOG
-        )
+    if DO_DEPTH_AVG:
+        for varname in DEPTH_AVG['varnames']:
+            for depth_ceil, depth_floor in zip(DEPTH_AVG['depth_ceil'], DEPTH_AVG['depth_floor']):
+                print(f"\n>>> Computing depth-averaged {varname} ({depth_ceil}-{depth_floor}m)...")
+                so.fesom_depth_average(
+                    src_path=SRC_PATH_FESOM,
+                    dest_path=DEST_PATH_DEPTH_AVG,
+                    mesh_diag_path=MESH_DIAG_PATH,
+                    varname=varname,
+                    depth_range=(depth_ceil, depth_floor),
+                    years=years,
+                    log=LOG
+                )
     
     if DO_TOTAL_KINETIC_ENERGY:
         print("\n>>> Computing total kinetic energy...")
@@ -265,19 +240,18 @@ def run_postprocessing(year):
         )
     
     if DO_DEPTH_EXTRACT:
-        for extract_config in DO_DEPTH_EXTRACT:
-            varname = extract_config['varname']
-            depth = extract_config['depth']
-            print(f"\n>>> Extracting {varname} at {depth}m...")
-            so.fesom_extract_at_depth(
-                src_path=SRC_PATH_FESOM,
-                dest_path=DEST_PATH_DEPTH_EXTRACT,
-                mesh_diag_path=MESH_DIAG_PATH,
-                varname=varname,
-                depth=depth,
-                years=years,
-                log=LOG
-            )
+        for varname in DEPTH_EXTRACT['varnames']:
+            for depth in DEPTH_EXTRACT['depths']:
+                print(f"\n>>> Extracting {varname} at {depth}m...")
+                so.fesom_extract_at_depth(
+                    src_path=SRC_PATH_FESOM,
+                    dest_path=DEST_PATH_DEPTH_EXTRACT,
+                    mesh_diag_path=MESH_DIAG_PATH,
+                    varname=varname,
+                    depth=depth,
+                    years=years,
+                    log=LOG
+                )
     
     # -------------------------------------------------------------------------
     # Cavity/ice shelf processing (loop over all regional masks)
@@ -368,20 +342,19 @@ def run_postprocessing(year):
     
     if DO_SEA_ICE_AREA:
         print("\n>>> Computing sea ice area...")
-        for box in [SEA_ICE_BOX_SO, SEA_ICE_BOX_ARCTIC, SEA_ICE_BOX_ARCMED]:
+        for box in SEA_ICE_BOXES:
             so.fesom_sea_ice_area(
                 src_path=SRC_PATH_FESOM,
                 mesh_diag_path=MESH_DIAG_PATH,
                 years=years,
                 box=box,
-                siconc_threshold=SICONC_THRESHOLD,
                 savepath=DEST_PATH_SEA_ICE,
                 log=LOG
             )
         
     if DO_SEA_ICE_VOLUME:
         print("\n>>> Computing sea ice volume...")
-        for box in [SEA_ICE_BOX_SO, SEA_ICE_BOX_ARCTIC, SEA_ICE_BOX_ARCMED]:
+        for box in SEA_ICE_BOXES:
             so.fesom_sea_ice_volume(
                 src_path=SRC_PATH_FESOM,
                 mesh_diag_path=MESH_DIAG_PATH,
@@ -393,13 +366,12 @@ def run_postprocessing(year):
     
     if DO_SEA_ICE_EXTENT:
         print("\n>>> Computing sea ice extent...")
-        for box in [SEA_ICE_BOX_SO, SEA_ICE_BOX_ARCTIC, SEA_ICE_BOX_ARCMED]:
+        for box in SEA_ICE_BOXES:
             so.fesom_sea_ice_extent(
                 src_path=SRC_PATH_FESOM,
                 mesh_diag_path=MESH_DIAG_PATH,
                 years=years,
                 box=box,
-                siconc_threshold=SICONC_THRESHOLD,
                 savepath=DEST_PATH_SEA_ICE,
                 log=LOG
             )
@@ -425,6 +397,68 @@ def run_postprocessing(year):
             years=years,
             log=LOG
         )
+    
+    if DO_ICEBERG_COMBINE_FW:
+        print("\n>>> Combining iceberg freshwater flux components...")
+        so.fesom_iceberg_combine_components(
+            src_path=SRC_PATH_FESOM,
+            dest_path=DEST_PATH_ICEBERG,
+            years=years,
+            log=LOG
+        )
+
+    if DO_ICEBERG_INTEGRATED_FLUXES:
+        print("\n>>> Computing integrated iceberg fluxes...")
+        # Load AAshelf mask for onshelf/offshelf
+        mask_ds = xr.open_dataset(MASK_FILES_REGION[0])
+        shelf_mask = mask_ds['zbar_n_bottom'].values
+        onshelf_inds = np.where(shelf_mask > 0)[0]
+        offshelf_inds = np.where(shelf_mask == 0)[0]
+        
+        masks = [
+            {'name': 'global', 'inds': None},
+            {'name': 'onshelf', 'inds': onshelf_inds},
+            {'name': 'offshelf', 'inds': offshelf_inds}
+        ]
+        
+        for v in ['ibfw', 'ibhf']:
+            src = DEST_PATH_ICEBERG if v == 'ibfw' else SRC_PATH_FESOM
+            for m in masks:
+                so.fesom_iceberg_integrated_flux(
+                    src_path=src,
+                    mesh_diag_path=MESH_DIAG_PATH,
+                    varname=v,
+                    mask=m['inds'],
+                    mask_name=m['name'],
+                    years=years,
+                    log=LOG,
+                    savepath=DEST_PATH_ICEBERG
+                )
+        mask_ds.close()
+
+    if DO_ICEBERG_FLUX_TO_GTY:
+        print("\n>>> Converting iceberg fluxes to Gt/yr...")
+        for v in ['ibfw', 'ibhf']:
+            so.icebergflux_to_massflux_Gty(
+                src_path=DEST_PATH_ICEBERG,
+                dst_path=DEST_PATH_ICEBERG_GTY,
+                varname=v,
+                rho_fw=1000,
+                year=year,
+                log=LOG
+            )
+
+    if DO_ICEBERG_FLUX_TO_GTM:
+        print("\n>>> Converting iceberg fluxes to Gt/month...")
+        for v in ['ibfw', 'ibhf']:
+            so.icebergflux_to_massflux_Gtm(
+                src_path=DEST_PATH_ICEBERG,
+                dst_path=DEST_PATH_ICEBERG_GTM,
+                varname=v,
+                rho_fw=1000,
+                year=year,
+                log=LOG
+            )
     
     # -------------------------------------------------------------------------
     # Region mean vertical profiles

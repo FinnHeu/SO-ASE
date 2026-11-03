@@ -6,6 +6,12 @@ import os
 from .helpers_mesh import find_nodes_in_box
 
 
+def _split_box(box):
+    if isinstance(box, dict):
+        return box["box"], box.get("name")
+    return box, None
+
+
 def fesom_sea_ice_area(
     src_path,
     mesh_diag_path,
@@ -45,10 +51,12 @@ def fesom_sea_ice_area(
     years : tuple of int, optional
         Start and end year (end year exclusive) defining the range of years
         to process. Default is (1979, 2025).
-    box : list of float, optional
+    box : list of float or dict, optional
         Geographic bounding box specified as
         [lon_min, lon_max, lat_min, lat_max] in degrees.
         Longitudes are expected in degrees east, latitudes in degrees north.
+        Alternatively, a dict with key "box" (the bounding box above) and optional key "name",
+        which is used as the box part of the output filenames instead of the N/S/E/W string.
         Default is [-180, 180, -90, -60].
     siconc_threshold : float, optional
         Minimum sea ice concentration (range 0–1) required for a node to be
@@ -81,10 +89,11 @@ def fesom_sea_ice_area(
         print(f"{mesh_diag_path}fesom.mesh.diag.nc", flush=True)
 
     # Find indices of nodes within the specified box
+    box, name = _split_box(box)
     inds = find_nodes_in_box(mesh_diag_path, box=box, log=log)
 
     # Prepare filename-safe strings
-    box_str = (
+    box_str = name or (
         f"{format_lon(box[0])}_{format_lon(box[1])}_"
         f"{format_lat(box[2])}_{format_lat(box[3])}"
     )
@@ -182,9 +191,11 @@ def fesom_sea_ice_volume(
         which provides nodal coordinates and areas.
     years : tuple of int, optional
         Start and end year (exclusive) for the time series. Defaults to (1979, 2015).
-    box : list of float, optional
+    box : list of float or dict, optional
         Geographic bounding box as [lon_min, lon_max, lat_min, lat_max] to define the region
-        of interest. Defaults to `[-180, 180, -90, -60]` (entire Southern Hemisphere).
+        of interest. Alternatively, a dict with key "box" (the bounding box above) and optional key "name",
+        which is used as the box part of the output filenames instead of the N/S/E/W string.
+        Defaults to `[-180, 180, -90, -60]` (entire Southern Hemisphere).
     savepath : str
         Directory where the output NetCDF files will be written. The directory
         is created if it does not already exist.
@@ -217,10 +228,11 @@ def fesom_sea_ice_volume(
         print(f"{mesh_diag_path}fesom.mesh.diag.nc", flush=True)
 
     # Find indices of nodes within the specified box
+    box, name = _split_box(box)
     inds = find_nodes_in_box(mesh_diag_path, box=box, log=log)
 
     # Prepare filename-safe strings
-    box_str = (
+    box_str = name or (
         f"{format_lon(box[0])}_{format_lon(box[1])}_"
         f"{format_lat(box[2])}_{format_lat(box[3])}"
     )
@@ -330,10 +342,12 @@ def fesom_sea_ice_extent(
     years : tuple of int, optional
         Start and end year (end year exclusive) defining the range of years
         to process. Default is (1979, 2025).
-    box : list of float, optional
+    box : list of float or dict, optional
         Geographic bounding box specified as
         [lon_min, lon_max, lat_min, lat_max] in degrees.
         Longitudes are expected in degrees east, latitudes in degrees north.
+        Alternatively, a dict with key "box" (the bounding box above) and optional key "name",
+        which is used as the box part of the output filenames instead of the N/S/E/W string.
         Default is [-180, 180, -90, -60].
     siconc_threshold : float, optional
         Minimum sea ice concentration (range 0–1) required for a node to be
@@ -366,10 +380,11 @@ def fesom_sea_ice_extent(
         print(f"{mesh_diag_path}fesom.mesh.diag.nc", flush=True)
 
     # Find indices of nodes within the specified box
+    box, name = _split_box(box)
     inds = find_nodes_in_box(mesh_diag_path, box=box, log=log)
 
     # Prepare filename-safe strings
-    box_str = (
+    box_str = name or (
         f"{format_lon(box[0])}_{format_lon(box[1])}_"
         f"{format_lat(box[2])}_{format_lat(box[3])}"
     )

@@ -10,6 +10,7 @@ from os.path import isfile
 import glob
     
 from .helpers_mesh import unrotate_coordinates
+from ..miscellaneous.helpers_misc import seconds_per_month
 
 def read_iceberg_initial_files(icebergpath):
     """Reads iceberg initial condition files from the specified directory.
@@ -438,3 +439,279 @@ def fesom_total_iceberg_volume(
     
     if log:
         print("Done.", flush=True)
+
+
+def fesom_iceberg_combine_components(src_path, dest_path, years=(1979, 2015), log=True):
+    """
+    Combine iceberg freshwater flux components (ibfwb, ibfwbv, ibfwe, ibfwl) 
+    into a single ibfw file per year.
+
+    Parameters
+    ----------
+    src_path : str
+        Directory containing the annual FESOM iceberg component files 
+        (e.g., ibfwb.fesom.<year>.nc).
+    dest_path : str
+        Directory where the combined ibfw files will be saved.
+    years : tuple of int, default (1979, 2015)
+        Start and end years (inclusive) to process.
+    log : bool, default True
+        If True, print progress messages.
+
+    Returns
+    -------
+    None
+        Results are saved as NetCDF files named `ibfw.fesom.<year>.nc`.
+    """
+    os.makedirs(dest_path, exist_ok=True)
+    time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+    
+    for year in range(years[0], years[-1] + 1):
+        outfile = f"{dest_path}ibfw.fesom.{year}.nc"
+        if isfile(outfile):
+            if log:
+                print(f"Skipping (exists): {outfile}", flush=True)
+            continue
+            
+        components = ['ibfwb', 'ibfwbv', 'ibfwe', 'ibfwl']
+        ds_sum = None
+        
+        found_any = False
+        for comp in components:
+            infile = f"{src_path}{comp}.fesom.{year}.nc"
+            if not isfile(infile):
+                continue
+            
+            found_any = True
+            ds = xr.open_dataset(infile, decode_times=time_coder)
+            if ds_sum is None:
+                ds_sum = ds.copy()
+                ds_sum = ds_sum.rename({comp: 'ibfw'})
+            else:
+                ds_sum['ibfw'] = ds_sum['ibfw'] + ds[comp]
+            ds.close()
+            
+        if found_any and ds_sum is not None:
+            ds_sum['ibfw'].attrs = {
+                'long_name': 'total iceberg freshwater flux',
+                'units': 'm/s',
+                'description': 'Sum of ibfwb, ibfwbv, ibfwe, and ibfwl'
+            }
+            ds_sum.to_netcdf(outfile)
+            if log:
+                print(f"Saved: {outfile}", flush=True)
+            ds_sum.close()
+
+
+def fesom_iceberg_integrated_flux(
+    src_path, 
+    mesh_diag_path, 
+    varname='ibfw', 
+    mask=None, 
+    mask_name='global',
+    years=(1979, 2015), 
+    log=True, 
+    savepath='./'
+):
+    """
+    Compute and save integrated iceberg flux (freshwater or heat) time series.
+
+    Integrates the specified flux variable over all nodes or a subset of nodes 
+    defined by a mask. The flux is multiplied by the nodal area before summing.
+
+    Parameters
+    ----------
+    src_path : str
+        Directory containing the annual FESOM output files.
+    mesh_diag_path : str
+        Directory containing `fesom.mesh.diag.nc` for nodal areas.
+    varname : str, default 'ibfw'
+        Variable name to integrate (e.g., 'ibfw', 'ibhf').
+    mask : array-like, optional
+        Boolean mask or array of indices along the `nod2` dimension for 
+        regional integration. If None, computes global integration.
+    mask_name : str, default 'global'
+        Descriptive name of the mask used in the output filename.
+    years : tuple of int, default (1979, 2015)
+        Start and end years (inclusive) to process.
+    log : bool, default True
+        If True, print progress messages.
+    savepath : str, default './'
+        Directory where output NetCDF files will be saved.
+
+    Returns
+    -------
+    None
+        Results are saved as NetCDF files named `iceberg_<varname>_<mask_name>.<year>.nc`.
+    """
+    os.makedirs(savepath, exist_ok=True)
+    time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+    
+    mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
+    nod_area = mesh_diag.nod_area.max(dim='nz')
+    
+    for year in range(years[0], years[-1] + 1):
+        infile = f"{src_path}{varname}.fesom.{year}.nc"
+        outfile = f"{savepath}iceberg_{varname}_{mask_name}.{year}.nc"
+        
+        if isfile(outfile):
+            if log:
+                print(f"Skipping (exists): {outfile}", flush=True)
+            continue
+            
+        if not isfile(infile):
+            continue
+            
+        if log:
+            print(f"Integrating {varname} ({mask_name}) for {year}...", flush=True)
+            
+        ds = xr.open_dataset(infile, decode_times=time_coder)
+        data = ds[varname]
+        
+        # Handle vertical dimension if present
+        if 'nz1' in data.dims:
+            data = data.sum(dim='nz1')
+        elif 'nz' in data.dims:
+            data = data.sum(dim='nz')
+            
+        if mask is not None:
+            integrated = (data * nod_area).isel(nod2=mask).sum(dim='nod2')
+        else:
+            integrated = (data * nod_area).sum(dim='nod2')
+            
+        ds_out = xr.Dataset(
+            {
+                f"{varname}_integrated": integrated.astype(np.float32),
+            },
+            attrs={
+                "description": f"Integrated iceberg {varname} ({mask_name})",
+                "source_file": infile,
+                "mask_name": mask_name,
+            }
+        )
+        
+        ds_out.to_netcdf(outfile)
+        if log:
+            print(f"Saved: {outfile}", flush=True)
+        ds.close()
+    
+    mesh_diag.close()
+
+
+def icebergflux_to_massflux_Gty(src_path, dst_path, varname='ibfw', rho_fw=1000, year=None, log=True):
+    """
+    Convert spatially integrated iceberg flux time series into annual totals.
+
+    For freshwater flux (`ibfw`), converts volume flux (m³/s) to annual 
+    integrated mass flux (Gt/yr). For heat flux, computes the annual mean rate (W).
+
+    Parameters
+    ----------
+    src_path : str
+        Directory containing the integrated iceberg flux files.
+    dst_path : str
+        Directory where the annual total files will be saved.
+    varname : str, default 'ibfw'
+        Variable name processed ('ibfw' or 'ibhf').
+    rho_fw : float, default 1000
+        Density of freshwater in kg/m³, used to convert volume to mass.
+    year : int, optional
+        If specified, only process files for this year.
+    log : bool, default True
+        If True, print progress messages.
+
+    Returns
+    -------
+    None
+        Results are saved as NetCDF files with the suffix `_GTY`.
+    """
+    os.makedirs(dst_path, exist_ok=True)
+    pattern = f"iceberg_{varname}_*.{year}.nc" if year else f"iceberg_{varname}_*.nc"
+    files = np.sort(glob.glob(os.path.join(src_path, pattern)))
+    time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+    
+    for file in files:
+        basename = os.path.basename(file)
+        if "_GTY" in basename or "_GTM" in basename: continue
+        
+        outfile = os.path.join(dst_path, basename.replace(".nc", "_GTY.nc"))
+        if isfile(outfile):
+            continue
+            
+        ds = xr.open_dataset(file, decode_times=time_coder)
+        data = ds[f"{varname}_integrated"]
+        
+        if varname == 'ibfw':
+            massflux_water = data * rho_fw  # kg/s
+            year_val = int(data.groupby('time.year').mean().year.values)
+            seconds = seconds_per_month(year_val)
+            Gty = ((massflux_water * seconds).groupby('time.year').sum() * 1e-12)
+            ds_out = xr.Dataset({"iceberg_melt_GTY": Gty}, coords={"year": Gty.year})
+            ds_out["iceberg_melt_GTY"].attrs = {"units": "Gt/y", "long_name": "Iceberg freshwater flux in Gt/yr"}
+        else:
+            annual_mean = data.groupby('time.year').mean()
+            ds_out = xr.Dataset({f"{varname}_GTY": annual_mean}, coords={"year": annual_mean.year})
+            ds_out[f"{varname}_GTY"].attrs = {"units": "W", "long_name": f"Annual mean iceberg {varname}"}
+
+        ds_out.to_netcdf(outfile)
+        if log: print(f"Saved: {outfile}", flush=True)
+        ds.close()
+
+
+def icebergflux_to_massflux_Gtm(src_path, dst_path, varname='ibfw', rho_fw=1000, year=None, log=True):
+    """
+    Convert spatially integrated iceberg flux time series into monthly totals.
+
+    For freshwater flux (`ibfw`), converts volume flux (m³/s) to monthly 
+    integrated mass flux (Gt/month). For heat flux, keeps the monthly mean rate (W).
+
+    Parameters
+    ----------
+    src_path : str
+        Directory containing the integrated iceberg flux files.
+    dst_path : str
+        Directory where the monthly total files will be saved.
+    varname : str, default 'ibfw'
+        Variable name processed ('ibfw' or 'ibhf').
+    rho_fw : float, default 1000
+        Density of freshwater in kg/m³, used to convert volume to mass.
+    year : int, optional
+        If specified, only process files for this year.
+    log : bool, default True
+        If True, print progress messages.
+
+    Returns
+    -------
+    None
+        Results are saved as NetCDF files with the suffix `_GTM`.
+    """
+    os.makedirs(dst_path, exist_ok=True)
+    pattern = f"iceberg_{varname}_*.{year}.nc" if year else f"iceberg_{varname}_*.nc"
+    files = np.sort(glob.glob(os.path.join(src_path, pattern)))
+    time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+    
+    for file in files:
+        basename = os.path.basename(file)
+        if "_GTY" in basename or "_GTM" in basename: continue
+        
+        outfile = os.path.join(dst_path, basename.replace(".nc", "_GTM.nc"))
+        if isfile(outfile):
+            continue
+            
+        ds = xr.open_dataset(file, decode_times=time_coder)
+        data = ds[f"{varname}_integrated"]
+        
+        if varname == 'ibfw':
+            massflux_water = data * rho_fw  # kg/s
+            year_val = int(data.groupby('time.year').mean().year.values)
+            seconds = seconds_per_month(year_val)
+            Gtm = (massflux_water * seconds * 1e-12)
+            ds_out = xr.Dataset({"iceberg_melt_GTM": Gtm}, coords={"time": Gtm.time})
+            ds_out["iceberg_melt_GTM"].attrs = {"units": "Gt/m", "long_name": "Iceberg freshwater flux in Gt/month"}
+        else:
+            ds_out = xr.Dataset({f"{varname}_GTM": data}, coords={"time": data.time})
+            ds_out[f"{varname}_GTM"].attrs = {"units": "W", "long_name": f"Monthly mean iceberg {varname}"}
+
+        ds_out.to_netcdf(outfile)
+        if log: print(f"Saved: {outfile}", flush=True)
+        ds.close()

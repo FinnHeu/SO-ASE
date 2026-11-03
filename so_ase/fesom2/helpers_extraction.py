@@ -480,7 +480,7 @@ def fesom_region_mean_vertical_profile(
         print(f"Mask '{mask_name}': {len(inds)} nodes selected", flush=True)
     
     # Get nodal area for weighting (max over nz dimension, then select nodes)
-    nodal_area = mesh_diag.nod_area.max(dim='nz1').isel(nod2=inds)
+    nodal_area = mesh_diag.nod_area.max(dim='nz').isel(nod2=inds)
     
     for year in range(years[0], years[-1] + 1):
         input_file = f"{src_path}{varname}.fesom.{year}.nc"

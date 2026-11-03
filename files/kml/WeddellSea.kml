@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document>
+	<name>WeddellSea.kml</name>
+	<Style id="inline">
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>2</width>
+		</LineStyle>
+		<PolyStyle>
+			<fill>0</fill>
+		</PolyStyle>
+	</Style>
+	<StyleMap id="inline0">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#inline1</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#inline</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Style id="inline1">
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>2</width>
+		</LineStyle>
+		<PolyStyle>
+			<fill>0</fill>
+		</PolyStyle>
+	</Style>
+	<Placemark>
+		<name>WeddellSea</name>
+		<styleUrl>#inline0</styleUrl>
+		<LineString>
+			<tessellate>1</tessellate>
+			<coordinates>
+				-62.76175111943596,-65.34579559144814,0 -60.5395084330546,-64.43833933297374,0 -57.4760496717604,-63.40274673358654,0 -53.82332672346249,-62.54892690123988,0 -30.07706435505887,-62.57344019381804,0 -9.922210779605782,-63.00393724288395,0 -0.4389093231909369,-63.39921384494082,0 -1.298523797484327,-75.14670204967308,0 -1.526467632092694,-85.17609560119516,0 -58.10764773374392,-87.40945363991295,0 -112.4386154897299,-86.75732038371306,0 -96.38808925758889,-76.85534783495086,0 -72.138009828983,-75.99507265147219,0 -64.24272972520497,-74.08859842443796,0 -64.90336047121644,-71.26634659277103,0 -65.75490696273933,-69.31110272894635,0 -65.43757559014628,-67.13091838114593,0 -62.9197690959378,-65.44376559215192,0 
+			</coordinates>
+		</LineString>
+		<atom:link rel="app" href="https://www.google.com/earth/about/versions/#earth-pro" title="Google Earth Pro 7.3.7.1155"></atom:link>
+	</Placemark>
+</Document>
+</kml>
