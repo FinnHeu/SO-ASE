@@ -1,11 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=fesom_postproc
-#SBATCH --partition=compute
+#SBATCH --partition=shared
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --mem=0
-#SBATCH --exclusive
-#SBATCH --time=00:25:00
+#SBATCH --mem=40G
+#SBATCH --time=00:10:00
 #SBATCH --account=ab0995
 #SBATCH --output=logs/postprocessing/CMIP-PICTRL/postproc_%a.out
 #SBATCH --error=logs/postprocessing/CMIP-PICTRL/postproc_%a.err

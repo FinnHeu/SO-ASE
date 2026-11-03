@@ -1,14 +1,13 @@
 #!/bin/bash
 #SBATCH --job-name=fesom_postproc
-#SBATCH --partition=compute
+#SBATCH --partition=shared
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --mem=0
-#SBATCH --exclusive
-#SBATCH --time=00:25:00
+#SBATCH --mem=50GB
+#SBATCH --time=00:10:00
 #SBATCH --account=ab0995
-#SBATCH --output=logs/postprocessing/cav_icb/postproc_%a.out
-#SBATCH --error=logs/postprocessing/cav_icb/postproc_%a.err
+#SBATCH --output=logs/postprocessing/CAV-ICB/postproc_%a.out
+#SBATCH --error=logs/postprocessing/CAV-ICB/postproc_%a.err
 
 # ============================================================================
 #                    FESOM2 Postprocessing Job Script
@@ -36,7 +35,7 @@ CONDA_ENV="/home/a/a270186/.conda/envs/so_ase/"
 PYTHON_SCRIPT="/home/a/a270186/python_modules/SO-ASE/workflows_fesom/workflows_output/workflows_postprocessing/python/fesom_postprocessing_CAVICB.py"
 
 # Log directory
-LOG_DIR="./logs/postprocessing/"
+LOG_DIR="./logs/postprocessing/CAV-ICB"
 
 # ============================================================================
 #                         SETUP

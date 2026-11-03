@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=fesom_postproc
-#SBATCH --partition=compute
+#SBATCH --partition=shared
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --mem=40GB
-#SBATCH --time=00:35:00
+#SBATCH --mem=50GB
+#SBATCH --time=00:10:00
 #SBATCH --account=ab0995
 #SBATCH --output=./logs/postprocessing/FLUX-ON/postproc_%a.out
 #SBATCH --error=logs/postprocessing/FLUX-ON/postproc_%a.err

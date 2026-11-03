@@ -38,25 +38,9 @@ import so_ase as so
 DO_EXTRACT_BOTTOM_TEMP = False
 DO_EXTRACT_BOTTOM_SALT = False
 DO_EXTRACT_BOTTOM_SIGMA0 = False
-DO_DEPTH_AVG_TEMP_0_50 = False
-DO_DEPTH_AVG_TEMP_50_500 = False
-DO_DEPTH_AVG_SALT_0_50 = False
-DO_DEPTH_AVG_SALT_50_500 = False
+DO_DEPTH_AVG = False
 DO_TOTAL_KINETIC_ENERGY = False
-DO_DEPTH_EXTRACT = [
-    {'varname': 'temp', 'depth': 5},
-    {'varname': 'temp', 'depth': 50},
-    {'varname': 'temp', 'depth': 250},
-    {'varname': 'temp', 'depth': 500},
-    {'varname': 'temp', 'depth': 1000},
-    {'varname': 'temp', 'depth': 4000},
-    {'varname': 'salt', 'depth': 5},
-    {'varname': 'salt', 'depth': 50},
-    {'varname': 'salt', 'depth': 250},
-    {'varname': 'salt', 'depth': 500},
-    {'varname': 'salt', 'depth': 1000},
-    {'varname': 'salt', 'depth': 4000},
-]
+DO_DEPTH_EXTRACT = True
 # Cavity/ice shelf processing
 DO_SUBSHELF_FRESHWATERFLUX = False
 DO_SUBSHELF_HEATFLUX = False
@@ -112,11 +96,26 @@ KML_PATH = os.path.expanduser("~/python_modules/SO-ASE/files/kml/")
 #                         PROCESSING PARAMETERS
 # ============================================================================
 
+DEPTH_EXTRACT = {'varnames': ['temp', 'salt'], 'depths': [5, 50, 250, 500, 1000, 4000]}
+
+DEPTH_AVG = {'varnames': ['temp', 'salt'], 'depth_ceil': [0, 50], 'depth_floor': [50, 500]}
+
 # Sea ice parameters
-SEA_ICE_BOX_SO = [-180, 180, -90, -45]  # [lon_min, lon_max, lat_min, lat_max]
-SEA_ICE_BOX_ARCTIC = [-180, 180, 45, 90]  # [lon_min, lon_max, lat_min, lat_max]
-SEA_ICE_BOX_ARCMED = [-40, 100, 40, 80]  # [lon_min, lon_max, lat_min, lat_max]
-SICONC_THRESHOLD = 0.15
+SEA_ICE_BOX_SO = {"box": [-180, 180, -90, -45], "name": "SouthernOcean"}  # [lon_min, lon_max, lat_min, lat_max]
+SEA_ICE_BOX_WeddellSea = {"box": [-65, 0, -90, -45], "name": "WeddellSea"}
+SEA_ICE_BOX_WestIndianOcean = {"box": [0, 90, -90, -45], "name": "WestIndianOcean"}
+SEA_ICE_BOX_EastIndianOcean = {"box": [90, 170, -90, -45], "name": "EastIndianOcean"}
+SEA_ICE_BOX_RossSea = {"box": [170, 220, -90, -45], "name": "RossSea"}
+SEA_ICE_BOX_AmundsenBellingshausenSea = {"box": [-140, -65, -90, -45], "name": "AmundsenBellingshausenSea"}
+
+SEA_ICE_BOXES = [
+    SEA_ICE_BOX_SO,
+    SEA_ICE_BOX_WeddellSea,
+    SEA_ICE_BOX_WestIndianOcean,
+    SEA_ICE_BOX_EastIndianOcean,
+    SEA_ICE_BOX_RossSea,
+    SEA_ICE_BOX_AmundsenBellingshausenSea,
+]
 
 # Cavity mask configuration
 # List of all cavity masks to process (set to empty list [] to skip regional processing)
@@ -200,53 +199,19 @@ def run_postprocessing(year):
             log=LOG
         )
     
-    if DO_DEPTH_AVG_TEMP_0_50:
-        print("\n>>> Computing depth-averaged temperature (0-50m)...")
-        so.fesom_depth_average(
-            src_path=SRC_PATH_FESOM,
-            dest_path=DEST_PATH_DEPTH_AVG,
-            mesh_diag_path=MESH_DIAG_PATH,
-            varname='temp',
-            depth_range=(0, 50),
-            years=years,
-            log=LOG
-        )
-    
-    if DO_DEPTH_AVG_TEMP_50_500:
-        print("\n>>> Computing depth-averaged temperature (50-500m)...")
-        so.fesom_depth_average(
-            src_path=SRC_PATH_FESOM,
-            dest_path=DEST_PATH_DEPTH_AVG,
-            mesh_diag_path=MESH_DIAG_PATH,
-            varname='temp',
-            depth_range=(50, 500),
-            years=years,
-            log=LOG
-        )
-    
-    if DO_DEPTH_AVG_SALT_0_50:
-        print("\n>>> Computing depth-averaged salinity (0-50m)...")
-        so.fesom_depth_average(
-            src_path=SRC_PATH_FESOM,
-            dest_path=DEST_PATH_DEPTH_AVG,
-            mesh_diag_path=MESH_DIAG_PATH,
-            varname='salt',
-            depth_range=(0, 50),
-            years=years,
-            log=LOG
-        )
-    
-    if DO_DEPTH_AVG_SALT_50_500:
-        print("\n>>> Computing depth-averaged salinity (50-500m)...")
-        so.fesom_depth_average(
-            src_path=SRC_PATH_FESOM,
-            dest_path=DEST_PATH_DEPTH_AVG,
-            mesh_diag_path=MESH_DIAG_PATH,
-            varname='salt',
-            depth_range=(50, 500),
-            years=years,
-            log=LOG
-        )
+    if DO_DEPTH_AVG:
+        for varname in DEPTH_AVG['varnames']:
+            for depth_ceil, depth_floor in zip(DEPTH_AVG['depth_ceil'], DEPTH_AVG['depth_floor']):
+                print(f"\n>>> Computing depth-averaged {varname} ({depth_ceil}-{depth_floor}m)...")
+                so.fesom_depth_average(
+                    src_path=SRC_PATH_FESOM,
+                    dest_path=DEST_PATH_DEPTH_AVG,
+                    mesh_diag_path=MESH_DIAG_PATH,
+                    varname=varname,
+                    depth_range=(depth_ceil, depth_floor),
+                    years=years,
+                    log=LOG
+                )
     
     if DO_TOTAL_KINETIC_ENERGY:
         print("\n>>> Computing total kinetic energy...")
@@ -261,19 +226,18 @@ def run_postprocessing(year):
         )
     
     if DO_DEPTH_EXTRACT:
-        for extract_config in DO_DEPTH_EXTRACT:
-            varname = extract_config['varname']
-            depth = extract_config['depth']
-            print(f"\n>>> Extracting {varname} at {depth}m...")
-            so.fesom_extract_at_depth(
-                src_path=SRC_PATH_FESOM,
-                dest_path=DEST_PATH_DEPTH_EXTRACT,
-                mesh_diag_path=MESH_DIAG_PATH,
-                varname=varname,
-                depth=depth,
-                years=years,
-                log=LOG
-            )
+        for varname in DEPTH_EXTRACT['varnames']:
+            for depth in DEPTH_EXTRACT['depths']:
+                print(f"\n>>> Extracting {varname} at {depth}m...")
+                so.fesom_extract_at_depth(
+                    src_path=SRC_PATH_FESOM,
+                    dest_path=DEST_PATH_DEPTH_EXTRACT,
+                    mesh_diag_path=MESH_DIAG_PATH,
+                    varname=varname,
+                    depth=depth,
+                    years=years,
+                    log=LOG
+                )
     
     # -------------------------------------------------------------------------
     # Cavity/ice shelf processing (loop over all regional masks)
@@ -364,20 +328,19 @@ def run_postprocessing(year):
     
     if DO_SEA_ICE_AREA:
         print("\n>>> Computing sea ice area...")
-        for box in [SEA_ICE_BOX_SO, SEA_ICE_BOX_ARCTIC, SEA_ICE_BOX_ARCMED]:
+        for box in SEA_ICE_BOXES:
             so.fesom_sea_ice_area(
                 src_path=SRC_PATH_FESOM_PREPROCESSED,
                 mesh_diag_path=MESH_DIAG_PATH,
                 years=years,
                 box=box,
-                siconc_threshold=SICONC_THRESHOLD,
                 savepath=DEST_PATH_SEA_ICE,
                 log=LOG
             )
     
     if DO_SEA_ICE_VOLUME:
         print("\n>>> Computing sea ice volume...")
-        for box in [SEA_ICE_BOX_SO, SEA_ICE_BOX_ARCTIC, SEA_ICE_BOX_ARCMED]:
+        for box in SEA_ICE_BOXES:
             so.fesom_sea_ice_volume(
                 src_path=SRC_PATH_FESOM_PREPROCESSED,
                 mesh_diag_path=MESH_DIAG_PATH,
@@ -389,13 +352,12 @@ def run_postprocessing(year):
     
     if DO_SEA_ICE_EXTENT:
         print("\n>>> Computing sea ice extent...")
-        for box in [SEA_ICE_BOX_SO, SEA_ICE_BOX_ARCTIC, SEA_ICE_BOX_ARCMED]:
+        for box in SEA_ICE_BOXES:
             so.fesom_sea_ice_extent(
                 src_path=SRC_PATH_FESOM_PREPROCESSED,
                 mesh_diag_path=MESH_DIAG_PATH,
                 years=years,
                 box=box,
-                siconc_threshold=SICONC_THRESHOLD,
                 savepath=DEST_PATH_SEA_ICE,
                 log=LOG
             )
