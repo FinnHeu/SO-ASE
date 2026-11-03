@@ -16,8 +16,8 @@ def fesom_sea_ice_area(
     src_path,
     mesh_diag_path,
     years=(1979, 2025),
-    box=[-180, 180, -90, -60],
-    siconc_threshold=0.00,
+    box=[-180, 180, -90, -40],
+    siconc_threshold=0.0,
     savepath='./',
     log=True
 ):
@@ -70,9 +70,8 @@ def fesom_sea_ice_area(
 
     Returns
     -------
-    None
-        The function does not return any objects. Results are written directly
-        to disk as NetCDF files.
+    Concatenated sea ice area dataset
+        
     """
 
     def format_lat(lat):
@@ -121,6 +120,9 @@ def fesom_sea_ice_area(
     # Open files with cftime decoder
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
     ds = xr.open_mfdataset(files2load, decode_times=time_coder, chunks={"time": 12})
+    if 'nz' in ds.dims:
+        ds = ds.isel(nz=0) 
+        ds = ds.drop_vars('nz')
 
     # Crop datasets
     ds_cropped = ds.isel(nod2=inds)
@@ -159,13 +161,13 @@ def fesom_sea_ice_area(
 
     if log:
         print("All done!", flush=True)
-    return
+    return ds_out
 
 def fesom_sea_ice_volume(
     src_path, 
     mesh_diag_path,
     years=(1979, 2015), 
-    box=[-180, 180, -90, -60], 
+    box=[-180, 180, -90, -40], 
     savepath='./',
     log=True
 ):
@@ -202,9 +204,7 @@ def fesom_sea_ice_volume(
 
     Returns
     -------
-    None
-        The function does not return any objects. Results are written directly
-        to disk as NetCDF files.
+    Concatenated sea ice volume dataset
 
     Notes
     -----
@@ -260,6 +260,9 @@ def fesom_sea_ice_volume(
     # Open files with cftime decoder
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
     ds = xr.open_mfdataset(files2load, decode_times=time_coder, chunks={"time": 12})
+    if 'nz' in ds.dims:
+        ds = ds.isel(nz=0)
+        ds = ds.drop_vars('nz')
 
     # Crop datasets
     ds_cropped = ds.isel(nod2=inds)
@@ -298,12 +301,13 @@ def fesom_sea_ice_volume(
     if log:
         print("All done!", flush=True)
 
-    
+    return ds_out
+
 def fesom_sea_ice_extent(
     src_path,
     mesh_diag_path,
     years=(1979, 2025),
-    box=[-180, 180, -90, -60],
+    box=[-180, 180, -90, -40],
     siconc_threshold=0.15,
     savepath='./',
     log=True
@@ -357,9 +361,8 @@ def fesom_sea_ice_extent(
 
     Returns
     -------
-    None
-        The function does not return any objects. Results are written directly
-        to disk as NetCDF files.
+    Concatenated sea ice extent file
+
     """
 
     def format_lat(lat):
@@ -407,6 +410,9 @@ def fesom_sea_ice_extent(
     # Open files with cftime decoder
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
     ds = xr.open_mfdataset(files2load, decode_times=time_coder, chunks={"time": 12})
+    if 'nz' in ds.dims:
+        ds = ds.isel(nz=0) 
+        ds = ds.drop_vars('nz')
 
     # Crop datasets
     ds_cropped = ds.isel(nod2=inds)
@@ -443,6 +449,7 @@ def fesom_sea_ice_extent(
         if log:
             print(f"Saved: {name}", flush=True)
 
-
     if log:
         print("All done!", flush=True)
+
+    return ds_out

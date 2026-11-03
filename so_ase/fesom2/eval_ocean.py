@@ -8,9 +8,8 @@ from scipy.interpolate import griddata
 from os.path import isfile
 from os import remove
 from .helpers_mesh import find_nodes_in_box, add_element_volumes, build_cavity_mask, build_runoff_basin_mask
+xr.set_options(keep_attrs=True)
 
-# To Do:
-# ocean temperature 50S-65S horizontal mean
 
 
 def fesom_ocean_heat_transport_as_residual(
@@ -272,3 +271,91 @@ def fesom_total_kinetic_energy(src_path, mesh_diag_path, meshpath, years=(1979, 
                 print(f"Skipped: {file2save}")
 
     return
+
+
+def fesom_avg_var_surface(
+    src_path,
+    mesh_diag_path,
+    myvariable,
+    years=(1979, 2015),
+    box=[-180, 180, -55, -65],
+    log=True
+):
+    """
+    Compute area-average of surface variable within a specified geographic bounding box.
+    Spatial masking is based on the fesom.mesh.diag.nc file
+
+    Output is a dataset
+
+   Parameters
+    ----------
+    src_path : str
+        Path to the directory containing FESOM2 sea ice concentration files
+        named `a_ice.fesom.<year>.nc`.
+    mesh_diag_path : str
+        Path to the directory containing the FESOM mesh diagnostic file
+        `fesom.mesh.diag.nc`.
+    myvariable : str
+        FESOM variable name e.g. 'MLD3'
+    years : tuple of int, optional
+        Start and end year (end year exclusive) defining the range of years
+        to process. Default is (1979, 2025).
+    box : list of float, optional
+        Geographic bounding box specified as
+        [lon_min, lon_max, lat_min, lat_max] in degrees.
+        Longitudes are expected in degrees east, latitudes in degrees north.
+        Default is [-180, 180, -65, -55].
+    log : bool, optional
+        If True, print progress messages, including file loading, skipping,
+        and saving information. Default is True.
+
+    Returns
+    -------
+    Concatenated dataset - one per variable
+
+    """
+  # Load mesh diagnostic file once
+    mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
+    if log:
+        print("Mesh diagnostics loaded:", flush=True)
+        print(f"{mesh_diag_path}fesom.mesh.diag.nc", flush=True)
+
+    # Find indices of nodes within the specified box
+    inds = find_nodes_in_box(mesh_diag_path, box=box, log=log)
+    mesh_diag_cropped = mesh_diag.isel(nod2=inds)
+    tot_area = mesh_diag_cropped.nod_area.isel(nz=0).drop_vars('nz') #m^2
+
+    # Load files from src_path
+    files2load = [f"{src_path}{myvariable}.fesom.{y}.nc" for y in range(years[0], years[1] + 1)]
+
+    result = []
+    for file in files2load:
+        ds = xr.open_dataset(file)
+        if 'nz1' in ds.dims:
+            ds = ds.isel(nz1=0)
+            ds = ds.drop_vars('nz1')
+
+        if 'nz' in ds.dims:
+            ds = ds.isel(nz=0)
+            ds = ds.drop_vars('nz')
+        ds = ds.load()
+        if log:
+            print(f"File loaded: {file}", flush=True)
+
+        # Crop datasets
+        ds = ds.isel(nod2=inds)
+
+        # Sum over non-masked nodal areas
+        ds_avg = (ds[myvariable] * tot_area).sum(dim="nod2")/tot_area.sum(dim="nod2")
+        result.append(ds_avg)
+
+    result = xr.concat(result, dim='time')
+
+    # Metadata
+    result = result.to_dataset(name=myvariable)
+    result[myvariable].attrs["bounding box"] = (f"Longitude: {box[0]}E to {box[1]}E, Latitude: {box[2]}N to {box[3]}N")
+
+    if myvariable=='MLD3': # typical convention
+        result[myvariable] = -result[myvariable]
+
+    return result
