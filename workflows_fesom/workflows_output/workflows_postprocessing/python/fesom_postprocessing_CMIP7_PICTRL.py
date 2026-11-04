@@ -55,10 +55,7 @@ DO_SEA_ICE_VOLUME = True
 DO_SEA_ICE_EXTENT = True
 
 # Region mean vertical profiles
-DO_REGION_MEAN_PROFILE = [
-    {'varname': 'temp'}, 
-    {'varname': 'salt'}
-    ]  # Set to False to disable
+DO_REGION_MEAN_PROFILE = True  # Set to False to disable
 
 # ============================================================================
 #                         PATH CONFIGURATION
@@ -83,11 +80,6 @@ DEST_PATH_DEPTH_AVG = DEST_PATH_BASE + "depth_averages/"
 DEST_PATH_DEPTH_EXTRACT = DEST_PATH_BASE + "depth_extracts/"
 DEST_PATH_REGION_AVG = DEST_PATH_BASE + "region_averages/"
 
-# Mask files for region averaging (list of mask file paths)
-MASK_FILES_REGION = [
-    MESH_PATH + "mask.AAshelf.max1000m.nc",
-]
-
 # KML path for regional masks (cavity processing)
 KML_PATH = os.path.expanduser("~/python_modules/SO-ASE/files/kml/")
 
@@ -98,6 +90,9 @@ KML_PATH = os.path.expanduser("~/python_modules/SO-ASE/files/kml/")
 DEPTH_EXTRACT = {'varnames': ['temp', 'salt'], 'depths': [5, 50, 250, 500, 1000, 4000]}
 
 DEPTH_AVG = {'varnames': ['temp', 'salt'], 'depth_ceil': [0, 50], 'depth_floor': [50, 500]}
+
+# Mask files for region averaging (list of mask file paths)
+REGION_MEAN_PROFILE = {'varnames': ['temp', 'salt', 'dens_sigma0', 'dens_insitu'], 'regions': [f'{MESH_PATH}mask.AAshelf.max1000m.nc']}
 
 # Sea ice parameters
 SEA_ICE_BOX_SO = {"box": [-180, 180, -90, -45], "name": "SouthernOcean"}  # [lon_min, lon_max, lat_min, lat_max]
@@ -366,9 +361,8 @@ def run_postprocessing(year):
     # -------------------------------------------------------------------------
     
     if DO_REGION_MEAN_PROFILE:
-        for mask_file in MASK_FILES_REGION:
-            for profile_config in DO_REGION_MEAN_PROFILE:
-                varname = profile_config['varname']
+        for mask_file in REGION_MEAN_PROFILE['regions']:
+            for varname in REGION_MEAN_PROFILE['varnames']:
                 print(f"\n>>> Computing region mean vertical profile for {varname} ({mask_file})...")
                 so.fesom_region_mean_vertical_profile(
                     src_path=SRC_PATH_FESOM,
