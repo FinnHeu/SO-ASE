@@ -434,10 +434,10 @@ def fesom_subshelf_hydrography(src_path, mesh_diag_path, mesh_path, mask, years=
               provided in ``mask['kml_path']``.
         - If a **list** or **np.array**, it is interpreted as a boolean or
           integer mask directly indexable along the ``nod2`` dimension.
-    years : tuple of int, optional
-        Two-element tuple defining the year range to process.
-        The function processes all years in ``range(years[0], years[1])``.
-        For example, ``years=(1979, 1980)`` processes only 1979.
+    years : int or tuple/list of int, optional
+        A single int loads only that year's file.
+        A two-element tuple/list ``(start, end)`` loads all files from
+        ``start`` to ``end`` inclusive.
     variable : str or list of str, optional
         One or more variable names to extract from the source files.
     mean : bool, optional
@@ -478,14 +478,17 @@ def fesom_subshelf_hydrography(src_path, mesh_diag_path, mesh_path, mask, years=
     if isinstance(variable, str):
         variable = [variable]
 
+    years_range = np.array([years]) if isinstance(years, int) else np.arange(years[0], years[-1] + 1)
+
     for var in variable:
 
         if log:
-            print(f"Opening all files for {var}...")
+            print(f"Opening files for {var}, years {years_range[0]}-{years_range[-1]}...")
 
-        # OPEN ALL FILES AT ONCE
+        # OPEN ONLY THE REQUESTED YEARS
+        files = [f"{src_path}{var}.fesom.{y}.nc" for y in years_range]
         ds = xr.open_mfdataset(
-            f"{src_path}{var}.fesom.*.nc",
+            files,
             combine='by_coords',
             parallel=True,
             decode_times=time_coder,
@@ -493,7 +496,7 @@ def fesom_subshelf_hydrography(src_path, mesh_diag_path, mesh_path, mask, years=
         )
 
         # --- subset years ---
-        ds = ds.sel(time=slice(f"{years[0]}", f"{years[-1]}"))
+        ds = ds.sel(time=slice(f"{years_range[0]}", f"{years_range[-1]}"))
 
         # --- subset nodes early ---
         ds = ds.isel(nod2=node_mask)
@@ -511,7 +514,6 @@ def fesom_subshelf_hydrography(src_path, mesh_diag_path, mesh_path, mask, years=
         result = result.chunk({'time': 12})
 
         # --- split ONLY at write stage ---
-        years_range = np.arange(years[0], years[-1] + 1)
 
         for y in years_range:
             yearly = result.sel(time=str(y))
