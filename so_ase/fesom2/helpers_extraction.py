@@ -431,7 +431,7 @@ def fesom_region_mean_vertical_profile(
     mesh_diag_path : str
         Path to directory containing `fesom.mesh.diag.nc`.
     mask_file : str
-        Path to NetCDF file containing a 1D binary mask variable.
+        Path to NetCDF file containing a 1D binary mask variable named `mask`
         The mask should have dimension matching nod2 with values 0/1 or True/False.
     varname : str, optional
         Variable name to extract (e.g., 'temp', 'salt'). Default is 'temp'.
@@ -467,8 +467,7 @@ def fesom_region_mean_vertical_profile(
     
     # Load the mask file and extract mask variable
     mask_ds = xr.open_dataset(mask_file)
-    mask_varname = 'zbar_n_bottom'
-    mask = mask_ds[mask_varname].values
+    mask = mask_ds['mask'].values
     
     # Get mask name from filename for output naming
     mask_basename = os.path.basename(mask_file)
@@ -477,14 +476,14 @@ def fesom_region_mean_vertical_profile(
     # Find indices where mask is True/1
     inds = np.where(mask > 0)[0]
     if log:
-        print(f"Mask '{mask_name}': {len(inds)} nodes selected", flush=True)
+        print(f"Mask: {len(inds)} nodes selected", flush=True)
     
     # Get nodal area for weighting (max over nz dimension, then select nodes)
     nodal_area = mesh_diag.nod_area.max(dim='nz').isel(nod2=inds)
     
     for year in range(years[0], years[-1] + 1):
         input_file = f"{src_path}{varname}.fesom.{year}.nc"
-        output_file = f"{dest_path}{varname}_region_profile.{mask_name}.{year}.nc"
+        output_file = f"{dest_path}{varname}_region_mean_profile.{mask_name}.{year}.nc"
         
         if isfile(output_file):
             if log:
@@ -529,5 +528,149 @@ def fesom_region_mean_vertical_profile(
     mesh_diag.close()
     mask_ds.close()
     
+    if log:
+        print("Done.", flush=True)
+
+
+def fesom_region_zonal_mean_vertical_profiles(
+    src_path,
+    dest_path,
+    mesh_diag_path,
+    mask_file,
+    varname='temp',
+    years=(1979, 2015),
+    log=True,
+    lat_increment=0.1
+):
+    """
+    Compute area-weighted zonal mean vertical profiles (latitude x depth) for a masked region
+    from FESOM2 output.
+
+    Nodes inside the mask are binned into latitude bands of width `lat_increment`. For each
+    year and time step, the area-weighted mean is computed within each band at every depth
+    level. Band edges are multiples of `lat_increment`, so profiles from different masks and
+    years share the same latitude grid. Bands without selected nodes are NaN.
+
+    Parameters
+    ----------
+    src_path : str
+        Path to directory containing FESOM2 output files named
+        `{varname}.fesom.{year}.nc`.
+    dest_path : str
+        Path to directory where output files will be saved.
+    mesh_diag_path : str
+        Path to directory containing `fesom.mesh.diag.nc` (must provide `lat`, `nod_area`).
+    mask_file : str
+        Path to NetCDF file containing a 1D binary mask variable named `mask`.
+        The mask should have dimension matching nod2 with values 0/1 or True/False.
+    varname : str, optional
+        Variable name to extract (e.g., 'temp', 'salt'). Default is 'temp'.
+    years : tuple of int, optional
+        Start and end year (inclusive) to process. Default is (1979, 2015).
+    log : bool, optional
+        If True, print progress messages. Default is True.
+    lat_increment : float, optional
+        Meridional bin width in degrees. Default is 0.1.
+
+    Returns
+    -------
+    None
+        Results are written to NetCDF files named
+        `{varname}_region_zonal_profile.{mask_name}.{year}.nc` with dimensions (time, nz1, lat).
+
+    Example
+    -------
+    >>> fesom_region_zonal_mean_vertical_profiles(
+    ...     src_path='/path/to/fesom/output/',
+    ...     dest_path='/path/to/output/',
+    ...     mesh_diag_path='/path/to/mesh/',
+    ...     mask_file='/path/to/mesh/masks/RossSea_deep.nc',
+    ...     varname='temp',
+    ...     years=(2000, 2010),
+    ...     lat_increment=0.5
+    ... )
+    """
+    import os
+    os.makedirs(dest_path, exist_ok=True)
+
+    time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+
+    # Load mesh diagnostics for nodal areas and latitudes
+    mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
+
+    # Load the mask file and extract mask variable
+    mask_ds = xr.open_dataset(mask_file)
+    mask = mask_ds['mask'].values
+
+    # Get mask name from filename for output naming
+    mask_basename = os.path.basename(mask_file)
+    mask_name = mask_basename.replace('.nc', '').replace('mask.', '')
+
+    # Find indices where mask is True/1
+    inds = np.where(mask > 0)[0]
+    if log:
+        print(f"Mask: {len(inds)} nodes selected", flush=True)
+
+    nodal_area = mesh_diag.nod_area.max(dim='nz').isel(nod2=inds).values
+    lat = mesh_diag.lat.isel(nod2=inds).values
+
+    # Latitude bands aligned to multiples of lat_increment
+    lat0 = np.floor(lat.min() / lat_increment) * lat_increment
+    nbins = int(np.ceil((lat.max() - lat0) / lat_increment))
+    edges = lat0 + lat_increment * np.arange(nbins + 1)
+    lat_centers = 0.5 * (edges[:-1] + edges[1:])
+    bin_idx = np.clip(np.digitize(lat, edges) - 1, 0, nbins - 1)
+    w = xr.DataArray(nodal_area, dims='nod2')
+
+    for year in range(years[0], years[-1] + 1):
+        input_file = f"{src_path}{varname}.fesom.{year}.nc"
+        output_file = f"{dest_path}{varname}_region_zonal_profile.{mask_name}.{year}.nc"
+
+        if isfile(output_file):
+            if log:
+                print(f"Skipping (exists): {output_file}", flush=True)
+            continue
+
+        if not isfile(input_file):
+            if log:
+                print(f"Input file not found: {input_file}", flush=True)
+            continue
+
+        if log:
+            print(f"Processing: {input_file}", flush=True)
+
+        ds = xr.open_mfdataset(input_file, decode_times=time_coder)
+
+        # Select nodes within the masked region and assign their latitude band
+        da = ds[varname].isel(nod2=inds).load().assign_coords(latbin=('nod2', bin_idx))
+
+        # Area-weighted mean per latitude band, ignoring NaN (e.g. below bathymetry)
+        num = (da.fillna(0) * w).groupby('latbin').sum('nod2')
+        den = (da.notnull() * w).groupby('latbin').sum('nod2')
+        zonal = (num / den.where(den > 0)).reindex(latbin=np.arange(nbins))
+        zonal = zonal.rename(latbin='lat').assign_coords(lat=lat_centers)
+
+        ds_out = xr.Dataset(
+            {
+                varname: zonal.astype(np.float32),
+            },
+            attrs={
+                "description": f"Area-weighted zonal mean vertical profile of {varname} in region {mask_name}",
+                "source_file": input_file,
+                "mask_file": mask_file,
+                "mask_name": mask_name,
+                "lat_increment": lat_increment,
+            }
+        )
+
+        ds_out.to_netcdf(output_file)
+        if log:
+            print(f"Saved: {output_file}", flush=True)
+
+        ds.close()
+
+    mesh_diag.close()
+    mask_ds.close()
+
     if log:
         print("Done.", flush=True)

@@ -56,6 +56,7 @@ DO_SEA_ICE_EXTENT = False
 
 # Region mean vertical profiles
 DO_REGION_MEAN_PROFILE = False
+DO_REGION_ZONAL_MEAN_PROFILE = True  # Set to False to disable
 
 # ============================================================================
 #                         PATH CONFIGURATION
@@ -367,6 +368,20 @@ def run_postprocessing(year):
             for varname in REGION_MEAN_PROFILE['varnames']:
                 print(f"\n>>> Computing region mean vertical profile for {varname} ({mask_file})...")
                 so.fesom_region_mean_vertical_profile(
+                    src_path=SRC_PATH_FESOM,
+                    dest_path=DEST_PATH_REGION_AVG,
+                    mesh_diag_path=MESH_DIAG_PATH,
+                    mask_file=mask_file,
+                    varname=varname,
+                    years=years,
+                    log=LOG
+                )
+
+    if DO_REGION_ZONAL_MEAN_PROFILE:
+        for mask_file in REGION_MEAN_PROFILE['regions']:
+            for varname in REGION_MEAN_PROFILE['varnames']:
+                print(f"\n>>> Computing region zonal mean vertical profile for {varname} ({mask_file})...")
+                so.fesom_region_zonal_mean_vertical_profiles(
                     src_path=SRC_PATH_FESOM,
                     dest_path=DEST_PATH_REGION_AVG,
                     mesh_diag_path=MESH_DIAG_PATH,
