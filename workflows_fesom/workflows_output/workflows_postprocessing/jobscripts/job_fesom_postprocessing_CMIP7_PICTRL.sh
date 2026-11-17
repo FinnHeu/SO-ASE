@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=fesom_postproc
-#SBATCH --partition=shared
+#SBATCH --job-name=CMIP7-PICTRL
+#SBATCH --partition=compute
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --mem=40G
-#SBATCH --time=00:10:00
-#SBATCH --account=ab0995
+#SBATCH --mem=64G
+#SBATCH --time=00:45:00
+#SBATCH --account=ba1550
 #SBATCH --output=logs/postprocessing/CMIP-PICTRL/postproc_%a.out
 #SBATCH --error=logs/postprocessing/CMIP-PICTRL/postproc_%a.err
 

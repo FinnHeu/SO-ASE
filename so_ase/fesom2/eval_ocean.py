@@ -203,7 +203,13 @@ def fesom_timeseries_of_mean_vertical_profile_in_region(
 
     return ds_out
     
-def fesom_total_kinetic_energy(src_path, mesh_diag_path, meshpath, years=(1979, 2015), mask='cavity', log=False, savepath='./'):  
+def fesom_total_kinetic_energy(src_path, mesh_diag_path, meshpath, year, mask='cavity', log=False, savepath='./'):  
+
+    file2save = f"{savepath}kinetic_energy_{mask}.{year}.nc"
+    if isfile(file2save):
+        if log:
+            print(f"Skipped: {file2save}")
+        return
 
     # load mesh diagnostics
     mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
@@ -219,56 +225,46 @@ def fesom_total_kinetic_energy(src_path, mesh_diag_path, meshpath, years=(1979, 
         element_mask = ~mask
     else:
         pass
-        
-    # Build list of all input files
-    years_list = list(range(years[0], years[-1] + 1))
-    files_u = [f"{src_path}u.fesom.{y}.nc" for y in years_list]
-    files_v = [f"{src_path}v.fesom.{y}.nc" for y in years_list]
 
-    for i, (file_u, file_v) in enumerate(zip(files_u, files_v)):
+    file_u = f"{src_path}u.fesom.{year}.nc"
+    file_v = f"{src_path}v.fesom.{year}.nc"
 
-        file2save = f"{savepath}kinetic_energy_{mask}.{years_list[i]}.nc"
-        if not isfile(file2save):
-            
-            # Open files with cftime decoder
-            time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-            
-            ds_u = xr.open_dataset(file_u, decode_times=time_coder)
-            ds_v = xr.open_dataset(file_v, decode_times=time_coder)
-        
-            if log:
-                print(f"Opened:{file_u}, {file_v}", flush=True)
-        
-            # ---- Compute |u|^2 from u, v ----
-            da_uv2 = ds_u.u**2 + ds_v.v**2
-        
-            # ---- Multiply by constant element volumes ----
-            KE = 0.5 * mesh_diag.elem_volume * 1030 * da_uv2 # 1/2 * m * |u|^2
-        
-            # ---- Sum along vertical ----
-            KE = KE.sum(dim="nz1")
-        
-            # ---- Apply element mask ----
-            if mask is not None:
-                KE = KE.isel(elem=element_mask).sum(dim="elem")
-            else:
-                KE = KE.sum(dim="elem")
-        
-            ds_out = xr.Dataset(
-            {
-                "KE": KE
-            },
-            coords={
-                "time": KE.time
-            }
-            )
-    
-            ds_out.to_netcdf(file2save)
-            if log:
-                print(f"Saved: {file2save}")
-        else:
-            if log:
-                print(f"Skipped: {file2save}")
+    # Open files with cftime decoder
+    time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+
+    ds_u = xr.open_dataset(file_u, decode_times=time_coder)
+    ds_v = xr.open_dataset(file_v, decode_times=time_coder)
+
+    if log:
+        print(f"Opened:{file_u}, {file_v}", flush=True)
+
+    # ---- Compute |u|^2 from u, v ----
+    da_uv2 = ds_u.u**2 + ds_v.v**2
+
+    # ---- Multiply by constant element volumes ----
+    KE = 0.5 * mesh_diag.elem_volume * 1030 * da_uv2 # 1/2 * m * |u|^2
+
+    # ---- Sum along vertical ----
+    KE = KE.sum(dim="nz1")
+
+    # ---- Apply element mask ----
+    if mask is not None:
+        KE = KE.isel(elem=element_mask).sum(dim="elem")
+    else:
+        KE = KE.sum(dim="elem")
+
+    ds_out = xr.Dataset(
+    {
+        "KE": KE
+    },
+    coords={
+        "time": KE.time
+    }
+    )
+
+    ds_out.to_netcdf(file2save)
+    if log:
+        print(f"Saved: {file2save}")
 
     return
 

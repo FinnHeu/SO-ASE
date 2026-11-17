@@ -8,17 +8,16 @@ from os.path import isfile
 from .helpers_mesh import build_cavity_mask, build_cavity_regional_mask
 from ..miscellaneous.helpers_misc import seconds_per_month
 
-def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, mask, years=(1979, 2015), log=False, savepath='./'):
+def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, mask, year, log=False, savepath='./'):
     """
     Compute and save integrated subshelf basal melt time series from FESOM 
     freshwater flux output [m3/s].
 
-    This function loads monthly freshwater flux fields (`fw`) from a sequence 
-    of FESOM output files, multiplies them by the mean horizontal node area 
-    from a mesh diagnostics file, applies a cavity mask, and integrates the 
-    melt signal over all masked nodes to obtain a single subshelf melt 
-    time series for each year. The result for each year is saved as a 
-    standalone NetCDF file.
+    This function loads monthly freshwater flux fields (`fw`) from the FESOM
+    output file of a single year, multiplies them by the mean horizontal node
+    area from a mesh diagnostics file, applies a cavity mask, and integrates the
+    melt signal over all masked nodes to obtain a subshelf melt time series for
+    that year. The result is saved as a standalone NetCDF file.
 
     Parameters
     ----------
@@ -37,9 +36,8 @@ def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, mask, yea
         If ``dict['name'] == 'Amery'`` is given a .kml file called ``Amery.kml`` 
         will be loaded from ``dict['kml_path']`` from which the boolean mask will be generated.
         If an array-like mask is supplied, it is used directly for ``isel``.
-    years : tuple of int, default (1979, 2015)
-        Start and end years. The function processes files for all years in 
-        ``range(years[0], years[-1])``. (Note: the end year is excluded.)
+    year : int
+        Year to process.
     log : bool, default False
         If True, print a message whenever a file is saved or skipped.
     savepath : str, default './'
@@ -48,52 +46,30 @@ def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, mask, yea
     """
     
     print("\n--> Compute fesom subshelf freshwaterflux...")
-    
+
+    out_file = f"{savepath}subshelf_melt_{mask['name']}.{year}.nc"
+    if os.path.exists(out_file):
+        if log:
+            print(f"Skipping existing file: {out_file}")
+        return
+
     os.makedirs(savepath, exist_ok=True)
 
-    
-        
-    # Build list of all input/output files
-    years_list = list(range(years[0], years[-1] + 1))
-    in_files = [f"{src_path}fw.fesom.{y}.nc" for y in years_list]
-    out_files = [f"{savepath}subshelf_melt_{mask['name']}.{y}.nc" for y in years_list]
-    
-    # Filter: only load files whose output does not exist yet
-    files2load = []
-    files2save = []
-    years2process = []
-    
-    for in_file, out_file, y in zip(in_files, out_files, years_list):
-        if os.path.exists(out_file):
-            if log:
-                print(f"Skipping existing file: {out_file}")
+    # Build mask
+    mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
+    if isinstance(mask, dict):
+        if mask['name'] == 'all':
+            node_mask = build_cavity_mask(mesh_path, which='node')
         else:
-            files2load.append(in_file)
-            files2save.append(out_file)
-            years2process.append(y)
-    
-    if not files2load:
-        if log:
-            print("All files already exist. Nothing to process.")
-            return
+            node_mask = build_cavity_regional_mask(mesh_path, mask['kml_path'], name=mask['name'], which='node')
+    elif isinstance(mask, list) or isinstance(mask, np.array):
+        node_mask = mask
     else:
-        # Build mask
-        mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
-        if isinstance(mask, dict):
-            if mask['name'] == 'all':
-                node_mask = build_cavity_mask(mesh_path, which='node')
-            else:
-                node_mask = build_cavity_regional_mask(mesh_path, mask['kml_path'], name=mask['name'], which='node')
-            mask_name = mask['name']
-        elif isinstance(mask, list) or isinstance(mask, np.array):
-            node_mask = mask
-            mask_name = 'custom'
-        else:
-            raise ValueError('Mask type is not supported!')
+        raise ValueError('Mask type is not supported!')
 
-    # Open files with cftime decoder
+    # Open file with cftime decoder
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-    ds_fw = xr.open_mfdataset(files2load, decode_times=time_coder, chunks={"time": 12})
+    ds_fw = xr.open_mfdataset([f"{src_path}fw.fesom.{year}.nc"], decode_times=time_coder, chunks={"time": 12})
 
     # Compute subshelf melt
     SSM = (ds_fw.fw * mesh_diag.nod_area.max(dim='nz')).isel(nod2=node_mask).sum(dim='nod2')
@@ -114,30 +90,29 @@ def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, mask, yea
         "description": "sum(subshelf_melt(i) [m/s] * area(i) [m2]) over cavity region"
     }
 
-    # Split into annual chunks and save
-    for out_file, y in zip(files2save, years2process):
-        ds_year = ds_out.sel(time=ds_out.time.dt.year == y)
-        ds_year.to_netcdf(out_file)
-        if log:
-            print(f"Saved: {out_file}")
+    # Select the monthly data of this year and save
+    ds_year = ds_out.sel(time=ds_out.time.dt.year == year)
+    ds_year.to_netcdf(out_file)
+    if log:
+        print(f"Saved: {out_file}")
 
     if log:
         print("All done!")
 
     return
 
-def fesom_subshelf_heatflux(src_path, mesh_diag_path, mesh_path, mask, years=(1979, 2015), log=False, savepath='./'):
+def fesom_subshelf_heatflux(src_path, mesh_diag_path, mesh_path, mask, year, log=False, savepath='./'):
 
     """
     Compute and save integrated subshelf heat flux time series from FESOM 
     heat flux output.
 
-    This function loads monthly subshelf heat flux fields (`fh`) from a 
-    sequence of annual FESOM output files, multiplies them by the mean 
-    horizontal node area from a mesh diagnostics file, applies a cavity mask, 
-    and integrates the heat flux over all masked nodes to obtain a single 
-    area-integrated time series for each year. The result for each year is 
-    saved as a standalone NetCDF file.
+    This function loads monthly subshelf heat flux fields (`fh`) from the
+    annual FESOM output file of a single year, multiplies them by the mean
+    horizontal node area from a mesh diagnostics file, applies a cavity mask,
+    and integrates the heat flux over all masked nodes to obtain an
+    area-integrated time series for that year. The result is saved as a
+    standalone NetCDF file.
 
     Parameters
     ----------
@@ -157,9 +132,8 @@ def fesom_subshelf_heatflux(src_path, mesh_diag_path, mesh_path, mask, years=(19
         If ``dict['name'] == 'Amery'`` is given a .kml file called ``Amery.kml`` 
         will be loaded from ``dict['kml_path']`` from which the boolean mask will be generated.
         If an array-like mask is supplied, it is used directly for ``isel``.
-    years : tuple of int, default (1979, 2015)
-        Start and end years. The function processes files for all years in 
-        ``range(years[0], years[-1])``. (Note: the end year is excluded.)
+    year : int
+        Year to process.
     log : bool, default False
         If True, print status messages when saving or skipping files.
     savepath : str, default './'
@@ -177,54 +151,32 @@ def fesom_subshelf_heatflux(src_path, mesh_diag_path, mesh_path, mask, years=(19
         The function writes NetCDF files but does not return a value.
     """
     print("\n--> Compute fesom subshelf heatflux...")
-    
+
+    out_file = f"{savepath}subshelf_heatflux_{mask['name']}.{year}.nc"
+    if os.path.exists(out_file):
+        if log:
+            print(f"Skipping existing file: {out_file}")
+        return
+
     os.makedirs(savepath, exist_ok=True)
 
-    
-        
-    # Build list of all input/output files
-    years_list = list(range(years[0], years[-1] + 1))
-    in_files = [f"{src_path}fh.fesom.{y}.nc" for y in years_list]
-    out_files = [f"{savepath}subshelf_heatflux_{mask['name']}.{y}.nc" for y in years_list]
-    
-    # Filter: only load files whose output does not exist yet
-    files2load = []
-    files2save = []
-    years2process = []
-    
-    for in_file, out_file, y in zip(in_files, out_files, years_list):
-        if os.path.exists(out_file):
-            if log:
-                print(f"Skipping existing file: {out_file}")
+    # load mesh diagnostics
+    mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
+
+    # Build mask
+    if isinstance(mask, dict):
+        if mask['name'] == 'all':
+            node_mask = build_cavity_mask(mesh_path, which='node')
         else:
-            files2load.append(in_file)
-            files2save.append(out_file)
-            years2process.append(y)
-    
-    if not files2load:
-        if log:
-            print("All files already exist. Nothing to process.")
-            return
+            node_mask = build_cavity_regional_mask(mesh_path, mask['kml_path'], name=mask['name'], which='node')
+    elif isinstance(mask, list) or isinstance(mask, np.array):
+        node_mask = mask
     else:
-        # load mesh diagnostics
-        mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
+        raise ValueError('Mask type is not supported!')
 
-        # Build mask
-        if isinstance(mask, dict):
-            if mask['name'] == 'all':
-                node_mask = build_cavity_mask(mesh_path, which='node')
-            else:
-                node_mask = build_cavity_regional_mask(mesh_path, mask['kml_path'], name=mask['name'], which='node')
-            mask_name = mask['name']
-        elif isinstance(mask, list) or isinstance(mask, np.array):
-            node_mask = mask
-            mask_name = 'custom'
-        else:
-            raise ValueError('Mask type is not supported!')
-
-    # Open files with cftime decoder
+    # Open file with cftime decoder
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-    ds_fh = xr.open_mfdataset(files2load, decode_times=time_coder, chunks={"time": 12})
+    ds_fh = xr.open_mfdataset([f"{src_path}fh.fesom.{year}.nc"], decode_times=time_coder, chunks={"time": 12})
 
     # Compute subshelf heatflux
     SSHF = (ds_fh.fh * mesh_diag.nod_area.max(dim='nz')).isel(nod2=node_mask).sum(dim='nod2')
@@ -239,12 +191,11 @@ def fesom_subshelf_heatflux(src_path, mesh_diag_path, mesh_path, mask, years=(19
         }
     )
 
-    # Split into annual chunks and save
-    for out_file, y in zip(files2save, years2process):
-        ds_year = ds_out.sel(time=ds_out.time.dt.year == y)
-        ds_year.to_netcdf(out_file)
-        if log:
-            print(f"Saved: {out_file}")
+    # Select the monthly data of this year and save
+    ds_year = ds_out.sel(time=ds_out.time.dt.year == year)
+    ds_year.to_netcdf(out_file)
+    if log:
+        print(f"Saved: {out_file}")
 
     if log:
         print("All done!")
@@ -407,7 +358,7 @@ def freshwaterflux_to_massflux_Gtm(src_path, dst_path, rho_fw=1000, year=None, l
 
     return 
 
-def fesom_subshelf_hydrography(src_path, mesh_diag_path, mesh_path, mask, years=(1979,1980), variable='temp', mean=True, log=False, savepath='./'):
+def fesom_subshelf_hydrography(src_path, mesh_diag_path, mesh_path, mask, year, variable='temp', mean=True, log=False, savepath='./'):
     """
     Extract subshelf hydrography fields from FESOM output for a given node mask
     and save the subsetted fields to new NetCDF files.
@@ -434,10 +385,8 @@ def fesom_subshelf_hydrography(src_path, mesh_diag_path, mesh_path, mask, years=
               provided in ``mask['kml_path']``.
         - If a **list** or **np.array**, it is interpreted as a boolean or
           integer mask directly indexable along the ``nod2`` dimension.
-    years : tuple of int, optional
-        Two-element tuple defining the year range to process.
-        The function processes all years in ``range(years[0], years[1])``.
-        For example, ``years=(1979, 1980)`` processes only 1979.
+    year : int
+        Year to process. Only ``{variable}.fesom.<year>.nc`` is loaded.
     variable : str or list of str, optional
         One or more variable names to extract from the source files.
     mean : bool, optional
@@ -450,6 +399,24 @@ def fesom_subshelf_hydrography(src_path, mesh_diag_path, mesh_path, mask, years=
     
     print("\n--> Compute fesom subshelf hydrography...")
 
+    if isinstance(variable, str):
+        variable = [variable]
+
+    mask_name = mask['name'] if isinstance(mask, dict) else "custom"
+    todo = []
+    for var in variable:
+        out_file = f"{savepath}{var}_{mask_name}.{year}.nc"
+        if os.path.exists(out_file):
+            if log:
+                print(f"Skipping existing file: {out_file}", flush=True)
+        else:
+            todo.append(var)
+
+    if not todo:
+        return
+
+    os.makedirs(savepath, exist_ok=True)
+
     # --- Build mask ---
     if isinstance(mask, dict):
         if mask['name'] == 'all':
@@ -459,10 +426,8 @@ def fesom_subshelf_hydrography(src_path, mesh_diag_path, mesh_path, mask, years=
                 mesh_path, mask['kml_path'],
                 name=mask['name'], which='node'
             )
-        mask_name = mask['name']
     elif isinstance(mask, (list, np.ndarray)):
         node_mask = mask
-        mask_name = "custom"
     else:
         raise ValueError('Mask type is not supported!')
 
@@ -475,25 +440,19 @@ def fesom_subshelf_hydrography(src_path, mesh_diag_path, mesh_path, mask, years=
     # Use cftime decoder
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
 
-    if isinstance(variable, str):
-        variable = [variable]
-
-    for var in variable:
+    for var in todo:
 
         if log:
-            print(f"Opening all files for {var}...")
+            print(f"Opening file for {var}, year {year}...")
 
-        # OPEN ALL FILES AT ONCE
+        # OPEN ONLY THE REQUESTED YEAR
         ds = xr.open_mfdataset(
-            f"{src_path}{var}.fesom.*.nc",
+            [f"{src_path}{var}.fesom.{year}.nc"],
             combine='by_coords',
             parallel=True,
             decode_times=time_coder,
             chunks={'time': 12, 'nod2': 50000}
         )
-
-        # --- subset years ---
-        ds = ds.sel(time=slice(f"{years[0]}", f"{years[-1]}"))
 
         # --- subset nodes early ---
         ds = ds.isel(nod2=node_mask)
@@ -510,23 +469,19 @@ def fesom_subshelf_hydrography(src_path, mesh_diag_path, mesh_path, mask, years=
         # IMPORTANT: force graph creation ONCE (optional but often faster downstream)
         result = result.chunk({'time': 12})
 
-        # --- split ONLY at write stage ---
-        years_range = np.arange(years[0], years[-1] + 1)
+        # --- write ---
+        outfile = f"{savepath}{var}_{mask_name}.{year}.nc"
 
-        for y in years_range:
-            yearly = result.sel(time=str(y))
-            outfile = f"{savepath}{var}_{mask_name}.{y}.nc"
+        if log:
+            print(f"Writing {outfile}...")
 
-            if log:
-                print(f"Writing {outfile}...")
+        result.sel(time=str(year)).to_netcdf(
+            outfile,
+            #engine='h5netcdf',
+            #encoding={var: {'zlib': True, 'complevel': 4}}
+        )
 
-            yearly.to_netcdf(
-                outfile,
-                #engine='h5netcdf',
-                #encoding={var: {'zlib': True, 'complevel': 4}}
-            )
-
-            if log:
-                print(f"Saved: {outfile}")
+        if log:
+            print(f"Saved: {outfile}")
 
     return

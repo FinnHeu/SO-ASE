@@ -15,7 +15,7 @@ def _split_box(box):
 def fesom_sea_ice_area(
     src_path,
     mesh_diag_path,
-    years=(1979, 2025),
+    year,
     box=[-180, 180, -90, -40],
     siconc_threshold=0.0,
     savepath='./',
@@ -25,16 +25,15 @@ def fesom_sea_ice_area(
     Compute and save total sea ice area time series from FESOM2 output within a specified
     geographic bounding box.
 
-    This function processes yearly FESOM2 sea ice concentration files
+    This function processes the yearly FESOM2 sea ice concentration file
     (`a_ice.fesom.<year>.nc`), computes the total sea ice area by summing the
     nodal areas where sea ice concentration exceeds a given threshold, and
-    writes the result to disk as NetCDF files. One output file is written per
-    year containing the full time series for that year. If an output file already exists, that year is skipped.
+    writes the result to a NetCDF file for that year. If the output file already
+    exists, the function returns immediately without loading any data.
 
     The sea ice area is calculated only for mesh nodes that fall within the
     user-defined geographic bounding box. Spatial masking is based on the
-    FESOM mesh diagnostic file (`fesom.mesh.diag.nc`), which is loaded once
-    and reused for all years.
+    FESOM mesh diagnostic file (`fesom.mesh.diag.nc`).
 
     Output filenames are self-describing and include:
       - the processed year,
@@ -48,9 +47,8 @@ def fesom_sea_ice_area(
     mesh_diag_path : str
         Path to the directory containing the FESOM mesh diagnostic file
         `fesom.mesh.diag.nc`.
-    years : tuple of int, optional
-        Start and end year (end year exclusive) defining the range of years
-        to process. Default is (1979, 2025).
+    year : int
+        Year to process.
     box : list of float or dict, optional
         Geographic bounding box specified as
         [lon_min, lon_max, lat_min, lat_max] in degrees.
@@ -70,7 +68,7 @@ def fesom_sea_ice_area(
 
     Returns
     -------
-    Concatenated sea ice area dataset
+    Sea ice area dataset for `year`, or None if the output file already exists
         
     """
 
@@ -79,7 +77,20 @@ def fesom_sea_ice_area(
 
     def format_lon(lon):
         return f"{abs(lon)}{'W' if lon < 0 else 'E'}"
-        
+
+    # Prepare filename-safe strings
+    box, name = _split_box(box)
+    box_str = name or (
+        f"{format_lon(box[0])}_{format_lon(box[1])}_"
+        f"{format_lat(box[2])}_{format_lat(box[3])}"
+    )
+
+    out_file = f"{savepath}/sea_ice_area_{year}_{box_str}.nc"
+    if os.path.exists(out_file):
+        if log:
+            print(f"Skipping existing file: {out_file}", flush=True)
+        return
+
     os.makedirs(savepath, exist_ok=True)
 
     # Load mesh diagnostic file once
@@ -89,39 +100,13 @@ def fesom_sea_ice_area(
         print(f"{mesh_diag_path}fesom.mesh.diag.nc", flush=True)
 
     # Find indices of nodes within the specified box
-    box, name = _split_box(box)
     inds = find_nodes_in_box(mesh_diag_path, box=box, log=log)
 
-    # Prepare filename-safe strings
-    box_str = name or (
-        f"{format_lon(box[0])}_{format_lon(box[1])}_"
-        f"{format_lat(box[2])}_{format_lat(box[3])}"
-    )
-
-
-    in_files = [f"{src_path}a_ice.fesom.{year}.nc" for year in range(years[0], years[1] + 1)]
-    out_files = [f"{savepath}/sea_ice_area_{year}_{box_str}.nc" for year in range(years[0], years[1] + 1)]
-    files2load = []
-    files2save = []
-    
-    for out_file, in_file in zip(out_files, in_files):
-        if os.path.exists(out_file):
-            if log:
-                print(f"Skipping existing file: {out_file}", flush=True)
-        else:
-            files2load.append(in_file)
-            files2save.append(out_file)
-
-    if not files2load:
-        if log:
-            print("No new files to load")
-        return
-        
-    # Open files with cftime decoder
+    # Open file with cftime decoder
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-    ds = xr.open_mfdataset(files2load, decode_times=time_coder, chunks={"time": 12})
+    ds = xr.open_mfdataset([f"{src_path}a_ice.fesom.{year}.nc"], decode_times=time_coder, chunks={"time": 12})
     if 'nz' in ds.dims:
-        ds = ds.isel(nz=0) 
+        ds = ds.isel(nz=0)
         ds = ds.drop_vars('nz')
 
     # Crop datasets
@@ -136,7 +121,7 @@ def fesom_sea_ice_area(
         ds_cropped.a_ice * ice_mask * mesh_diag_cropped.nod_area.isel(nz=0)
     ).sum(dim="nod2")
 
-    # Create output dataset with full time series
+    # Create output dataset
     ds_out = sea_ice_area.to_dataset(name="sea_ice_area")
 
     # Variable metadata
@@ -151,22 +136,19 @@ def fesom_sea_ice_area(
     ds_out.attrs["source"] = "FESOM2"
     ds_out.attrs["siconc_threshold"] = siconc_threshold
 
-    # Split the monthly data into chunks for each individual year and save as xarray dataset
-    for name, y in zip(files2save, range(years[0], years[1] + 1)):
-        sia_year = ds_out.sel(time=ds_out.time.dt.year == y)
-        sia_year.to_netcdf(name)
-
-        if log:
-            print(f"Saved: {name}", flush=True)
+    # Select the monthly data of this year and save
+    sia_year = ds_out.sel(time=ds_out.time.dt.year == year)
+    sia_year.to_netcdf(out_file)
 
     if log:
+        print(f"Saved: {out_file}", flush=True)
         print("All done!", flush=True)
     return ds_out
 
 def fesom_sea_ice_volume(
     src_path, 
     mesh_diag_path,
-    years=(1979, 2015), 
+    year,
     box=[-180, 180, -90, -40], 
     savepath='./',
     log=True
@@ -176,10 +158,10 @@ def fesom_sea_ice_volume(
     geographic bounding box.
 
     This function loads sea ice concentration (`a_ice`) and thickness (`m_ice`) variables
-    from FESOM2 output files over a range of years, and calculates the sea ice volume by
+    from the FESOM2 output files of a single year, and calculates the sea ice volume by
     summing the product of sea ice thickness, concentration, and nodal area over the nodes
     that fall within a user-defined geographic region. One output file is written per
-    year containing the full time series for that year. If an output file already exists, that year is skipped.
+    year. If the output file already exists, the function returns immediately without loading any data.
 
     Parameters
     ----------
@@ -189,8 +171,8 @@ def fesom_sea_ice_volume(
     mesh_diag_path : str
         Path to the directory containing the mesh diagnostic file `fesom.mesh.diag.nc`,
         which provides nodal coordinates and areas.
-    years : tuple of int, optional
-        Start and end year (exclusive) for the time series. Defaults to (1979, 2015).
+    year : int
+        Year to process.
     box : list of float or dict, optional
         Geographic bounding box as [lon_min, lon_max, lat_min, lat_max] to define the region
         of interest. Alternatively, a dict with key "box" (the bounding box above) and optional key "name",
@@ -204,7 +186,7 @@ def fesom_sea_ice_volume(
 
     Returns
     -------
-    Concatenated sea ice volume dataset
+    Sea ice volume dataset for `year`, or None if the output file already exists
 
     Notes
     -----
@@ -218,7 +200,20 @@ def fesom_sea_ice_volume(
 
     def format_lon(lon):
         return f"{abs(lon)}{'W' if lon < 0 else 'E'}"
-        
+
+    # Prepare filename-safe strings
+    box, name = _split_box(box)
+    box_str = name or (
+        f"{format_lon(box[0])}_{format_lon(box[1])}_"
+        f"{format_lat(box[2])}_{format_lat(box[3])}"
+    )
+
+    out_file = f"{savepath}/sea_ice_volume_{year}_{box_str}.nc"
+    if os.path.exists(out_file):
+        if log:
+            print(f"Skipping existing file: {out_file}", flush=True)
+        return
+
     os.makedirs(savepath, exist_ok=True)
 
     # Load mesh diagnostic file
@@ -228,37 +223,11 @@ def fesom_sea_ice_volume(
         print(f"{mesh_diag_path}fesom.mesh.diag.nc", flush=True)
 
     # Find indices of nodes within the specified box
-    box, name = _split_box(box)
     inds = find_nodes_in_box(mesh_diag_path, box=box, log=log)
-
-    # Prepare filename-safe strings
-    box_str = name or (
-        f"{format_lon(box[0])}_{format_lon(box[1])}_"
-        f"{format_lat(box[2])}_{format_lat(box[3])}"
-    )
-
-    in_files_aice = [f"{src_path}a_ice.fesom.{year}.nc" for year in range(years[0], years[1] + 1)]
-    in_files_mice = [f"{src_path}m_ice.fesom.{year}.nc" for year in range(years[0], years[1] + 1)]
-    out_files = [f"{savepath}/sea_ice_volume_{year}_{box_str}.nc" for year in range(years[0], years[1] + 1)]
-    files2load = []
-    files2save = []
-    
-    for out_file, in_file_aice, in_file_mice in zip(out_files, in_files_aice, in_files_mice):
-        if os.path.exists(out_file):
-            if log:
-                print(f"Skipping existing file: {out_file}", flush=True)
-        else:
-            files2load.append(in_file_aice)
-            files2load.append(in_file_mice)
-            files2save.append(out_file)
-
-    if not files2load:
-        if log:
-            print("No new files to load")
-        return
 
     # Open files with cftime decoder
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+    files2load = [f"{src_path}a_ice.fesom.{year}.nc", f"{src_path}m_ice.fesom.{year}.nc"]
     ds = xr.open_mfdataset(files2load, decode_times=time_coder, chunks={"time": 12})
     if 'nz' in ds.dims:
         ds = ds.isel(nz=0)
@@ -275,7 +244,7 @@ def fesom_sea_ice_volume(
         * ds_cropped.a_ice
     ).sum(dim="nod2")
 
-    # Create output dataset with full time series
+    # Create output dataset
     ds_out = sea_ice_volume.to_dataset(name="sea_ice_volume")
 
     # Variable metadata
@@ -289,16 +258,12 @@ def fesom_sea_ice_volume(
     # Global metadata
     ds_out.attrs["source"] = "FESOM2"
 
-    # Split the monthly data into chunks for each individual year and save as xarray dataset
-    for name, y in zip(files2save, range(years[0], years[1] + 1)):
-        siv_year = ds_out.sel(time=ds_out.time.dt.year == y)
-        siv_year.to_netcdf(name)
-
-        if log:
-            print(f"Saved: {name}", flush=True)
-
+    # Select the monthly data of this year and save
+    siv_year = ds_out.sel(time=ds_out.time.dt.year == year)
+    siv_year.to_netcdf(out_file)
 
     if log:
+        print(f"Saved: {out_file}", flush=True)
         print("All done!", flush=True)
 
     return ds_out
@@ -306,7 +271,7 @@ def fesom_sea_ice_volume(
 def fesom_sea_ice_extent(
     src_path,
     mesh_diag_path,
-    years=(1979, 2025),
+    year,
     box=[-180, 180, -90, -40],
     siconc_threshold=0.15,
     savepath='./',
@@ -316,16 +281,15 @@ def fesom_sea_ice_extent(
     Compute and save total sea ice extent time series from FESOM2 output within a specified
     geographic bounding box.
 
-    This function processes yearly FESOM2 sea ice concentration files
+    This function processes the yearly FESOM2 sea ice concentration file
     (`a_ice.fesom.<year>.nc`), computes the total sea ice extent by summing the
     nodal areas where sea ice concentration exceeds a given threshold, and
-    writes the result to disk as NetCDF files. One output file is written per
-    year containing the full time series for that year. If an output file already exists, that year is skipped.
+    writes the result to a NetCDF file for that year. If the output file already
+    exists, the function returns immediately without loading any data.
 
     The sea ice extent is calculated only for mesh nodes that fall within the
     user-defined geographic bounding box. Spatial masking is based on the
-    FESOM mesh diagnostic file (`fesom.mesh.diag.nc`), which is loaded once
-    and reused for all years.
+    FESOM mesh diagnostic file (`fesom.mesh.diag.nc`).
 
     Output filenames are self-describing and include:
       - the processed year,
@@ -339,9 +303,8 @@ def fesom_sea_ice_extent(
     mesh_diag_path : str
         Path to the directory containing the FESOM mesh diagnostic file
         `fesom.mesh.diag.nc`.
-    years : tuple of int, optional
-        Start and end year (end year exclusive) defining the range of years
-        to process. Default is (1979, 2025).
+    year : int
+        Year to process.
     box : list of float or dict, optional
         Geographic bounding box specified as
         [lon_min, lon_max, lat_min, lat_max] in degrees.
@@ -361,7 +324,7 @@ def fesom_sea_ice_extent(
 
     Returns
     -------
-    Concatenated sea ice extent file
+    Sea ice extent dataset for `year`, or None if the output file already exists
 
     """
 
@@ -370,7 +333,20 @@ def fesom_sea_ice_extent(
 
     def format_lon(lon):
         return f"{abs(lon)}{'W' if lon < 0 else 'E'}"
-        
+
+    # Prepare filename-safe strings
+    box, name = _split_box(box)
+    box_str = name or (
+        f"{format_lon(box[0])}_{format_lon(box[1])}_"
+        f"{format_lat(box[2])}_{format_lat(box[3])}"
+    )
+
+    out_file = f"{savepath}/sea_ice_extent_{year}_{box_str}.nc"
+    if os.path.exists(out_file):
+        if log:
+            print(f"Skipping existing file: {out_file}", flush=True)
+        return
+
     os.makedirs(savepath, exist_ok=True)
 
     # Load mesh diagnostic file once
@@ -380,38 +356,13 @@ def fesom_sea_ice_extent(
         print(f"{mesh_diag_path}fesom.mesh.diag.nc", flush=True)
 
     # Find indices of nodes within the specified box
-    box, name = _split_box(box)
     inds = find_nodes_in_box(mesh_diag_path, box=box, log=log)
 
-    # Prepare filename-safe strings
-    box_str = name or (
-        f"{format_lon(box[0])}_{format_lon(box[1])}_"
-        f"{format_lat(box[2])}_{format_lat(box[3])}"
-    )
-
-    in_files = [f"{src_path}a_ice.fesom.{year}.nc" for year in range(years[0], years[1] + 1)]
-    out_files = [f"{savepath}/sea_ice_extent_{year}_{box_str}.nc" for year in range(years[0], years[1] + 1)]
-    files2load = []
-    files2save = []
-    
-    for out_file, in_file in zip(out_files, in_files):
-        if os.path.exists(out_file):
-            if log:
-                print(f"Skipping existing file: {out_file}", flush=True)
-        else:
-            files2load.append(in_file)
-            files2save.append(out_file)
-
-    if not files2load:
-        if log:
-            print("No new files to load")
-        return
-
-    # Open files with cftime decoder
+    # Open file with cftime decoder
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-    ds = xr.open_mfdataset(files2load, decode_times=time_coder, chunks={"time": 12})
+    ds = xr.open_mfdataset([f"{src_path}a_ice.fesom.{year}.nc"], decode_times=time_coder, chunks={"time": 12})
     if 'nz' in ds.dims:
-        ds = ds.isel(nz=0) 
+        ds = ds.isel(nz=0)
         ds = ds.drop_vars('nz')
 
     # Crop datasets
@@ -426,7 +377,7 @@ def fesom_sea_ice_extent(
         ice_mask * mesh_diag_cropped.nod_area.isel(nz=0)
     ).sum(dim="nod2")
 
-    # Create output dataset with full time series
+    # Create output dataset
     ds_out = sea_ice_extent.to_dataset(name="sea_ice_extent")
 
     # Variable metadata
@@ -441,15 +392,12 @@ def fesom_sea_ice_extent(
     ds_out.attrs["source"] = "FESOM2"
     ds_out.attrs["siconc_threshold"] = siconc_threshold
 
-    # Split the monthly data into chunks for each individual year and save as xarray dataset
-    for name, y in zip(files2save, range(years[0], years[1] + 1)):
-        sie_year = ds_out.sel(time=ds_out.time.dt.year == y)
-        sie_year.to_netcdf(name)
-
-        if log:
-            print(f"Saved: {name}", flush=True)
+    # Select the monthly data of this year and save
+    sie_year = ds_out.sel(time=ds_out.time.dt.year == year)
+    sie_year.to_netcdf(out_file)
 
     if log:
+        print(f"Saved: {out_file}", flush=True)
         print("All done!", flush=True)
 
     return ds_out

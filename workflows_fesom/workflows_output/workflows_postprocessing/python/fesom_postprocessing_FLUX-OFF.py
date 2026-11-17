@@ -22,6 +22,7 @@ Dependencies:
 
 import sys
 import os
+import glob
 import numpy as np
 import xarray as xr
 
@@ -48,8 +49,8 @@ DO_SUBSHELF_FRESHWATERFLUX = True
 DO_SUBSHELF_HEATFLUX = True
 DO_FRESHWATERFLUX_TO_GTY = True
 DO_FRESHWATERFLUX_TO_GTM = True
-DO_SUBSHELF_HYDROGRAPHY_TEMP = False
-DO_SUBSHELF_HYDROGRAPHY_SALT = False
+DO_SUBSHELF_HYDROGRAPHY_TEMP = True
+DO_SUBSHELF_HYDROGRAPHY_SALT = True
 
 # Iceberg processing
 DO_ICEBERG_HEATFLUX = True
@@ -65,12 +66,8 @@ DO_SEA_ICE_VOLUME = True
 DO_SEA_ICE_EXTENT = True
 
 # Region mean vertical profiles
-DO_REGION_MEAN_PROFILE = [
-    {'varname': 'temp'}, 
-    {'varname': 'salt'},
-    {'varname': 'dens_sigma0'},
-    {'varname': 'dens_insitu'}
-    ]  # Set to False to disable
+DO_REGION_MEAN_PROFILE = True  # Set to False to disable
+DO_REGION_ZONAL_MEAN_PROFILE = True  # Set to False to disable
 
 # ============================================================================
 #                         PATH CONFIGURATION
@@ -97,11 +94,6 @@ DEST_PATH_ICEBERG_GTY = DEST_PATH_BASE + "iceberg_gty/"
 DEST_PATH_ICEBERG_GTM = DEST_PATH_BASE + "iceberg_gtm/"
 DEST_PATH_REGION_AVG = DEST_PATH_BASE + "region_averages/"
 
-# Mask files for region averaging (list of mask file paths)
-MASK_FILES_REGION = [
-    MESH_PATH + "mask.AAshelf.max1000m.nc",
-]
-
 # KML path for regional masks (cavity processing)
 KML_PATH = os.path.expanduser("~/python_modules/SO-ASE/files/kml/")
 
@@ -109,9 +101,14 @@ KML_PATH = os.path.expanduser("~/python_modules/SO-ASE/files/kml/")
 #                         PROCESSING PARAMETERS
 # ============================================================================
 
-DEPTH_EXTRACT = {'varnames': ['temp', 'salt', 'dens_sigma0'], 'depths': [5, 50, 250, 500, 1000, 4000]}
+DEPTH_EXTRACT = {'varnames': ['temp', 'salt', 'dens_sigma0', 'unod', 'vnod'], 'depths': [5, 50, 250, 500, 1000, 2000, 4000]}
 
-DEPTH_AVG = {'varnames': ['temp', 'salt'], 'depth_ceil': [0, 50], 'depth_floor': [50, 500]}
+DEPTH_AVG = {'varnames': ['temp', 'salt', 'unod', 'vnod'], 'depth_ceil': [0, 50, 500, 1000], 'depth_floor': [50, 500, 1000, 2000]}
+
+# Mask files for region averaging (list of mask file paths)
+REGION_MEAN_PROFILE = {'varnames': ['temp', 'salt', 'dens_sigma0', 'dens_insitu', 'N2', 'unod', 'vnod'], 'regions': sorted(glob.glob(f'{MESH_PATH}masks/*.nc'))}
+
+MASK_FILE_SHELF = f'{MESH_PATH}masks/AntarcticShelf1000m.nc'
 
 # Sea ice parameters
 SEA_ICE_BOX_SO = {"box": [-180, 180, -90, -45], "name": "SouthernOcean"}  # [lon_min, lon_max, lat_min, lat_max]
@@ -177,7 +174,6 @@ def run_postprocessing(year):
                  DEST_PATH_ICEBERG_GTY, DEST_PATH_ICEBERG_GTM]:
         os.makedirs(path, exist_ok=True)
     
-    years = (year, year)  # Process single year
     
     # -------------------------------------------------------------------------
     # Ocean processing
@@ -189,7 +185,7 @@ def run_postprocessing(year):
             src_path=SRC_PATH_FESOM,
             dest_path=DEST_PATH_BOTTOM,
             varname='temp',
-            years=years,
+            year=year,
             log=LOG
         )
     
@@ -199,7 +195,7 @@ def run_postprocessing(year):
             src_path=SRC_PATH_FESOM,
             dest_path=DEST_PATH_BOTTOM,
             varname='salt',
-            years=years,
+            year=year,
             log=LOG
         )
     
@@ -209,7 +205,7 @@ def run_postprocessing(year):
             src_path=SRC_PATH_FESOM,
             dest_path=DEST_PATH_BOTTOM,
             varname='sigma0',
-            years=years,
+            year=year,
             log=LOG
         )
     
@@ -223,7 +219,7 @@ def run_postprocessing(year):
                     mesh_diag_path=MESH_DIAG_PATH,
                     varname=varname,
                     depth_range=(depth_ceil, depth_floor),
-                    years=years,
+                    year=year,
                     log=LOG
                 )
     
@@ -233,7 +229,7 @@ def run_postprocessing(year):
             src_path=SRC_PATH_FESOM,
             mesh_diag_path=MESH_DIAG_PATH,
             meshpath=MESH_PATH,
-            years=years,
+            year=year,
             mask=KE_MASK,
             log=LOG,
             savepath=DEST_PATH_KE
@@ -249,7 +245,7 @@ def run_postprocessing(year):
                     mesh_diag_path=MESH_DIAG_PATH,
                     varname=varname,
                     depth=depth,
-                    years=years,
+                    year=year,
                     log=LOG
                 )
     
@@ -270,7 +266,7 @@ def run_postprocessing(year):
                 mesh_diag_path=MESH_DIAG_PATH,
                 mesh_path=MESH_PATH,
                 mask=cavity_mask,
-                years=years,
+                year=year,
                 log=LOG,
                 savepath=DEST_PATH_SUBSHELF
             )
@@ -282,7 +278,7 @@ def run_postprocessing(year):
                 mesh_diag_path=MESH_DIAG_PATH,
                 mesh_path=MESH_PATH,
                 mask=cavity_mask,
-                years=years,
+                year=year,
                 log=LOG,
                 savepath=DEST_PATH_SUBSHELF
             )
@@ -294,7 +290,7 @@ def run_postprocessing(year):
                 mesh_diag_path=MESH_DIAG_PATH,
                 mesh_path=MESH_PATH,
                 mask=cavity_mask,
-                years=years,
+                year=year,
                 variable='temp',
                 mean=True,
                 log=LOG,
@@ -308,7 +304,7 @@ def run_postprocessing(year):
                 mesh_diag_path=MESH_DIAG_PATH,
                 mesh_path=MESH_PATH,
                 mask=cavity_mask,
-                years=years,
+                year=year,
                 variable='salt',
                 mean=True,
                 log=LOG,
@@ -346,7 +342,7 @@ def run_postprocessing(year):
             so.fesom_sea_ice_area(
                 src_path=SRC_PATH_FESOM,
                 mesh_diag_path=MESH_DIAG_PATH,
-                years=years,
+                year=year,
                 box=box,
                 savepath=DEST_PATH_SEA_ICE,
                 log=LOG
@@ -358,7 +354,7 @@ def run_postprocessing(year):
             so.fesom_sea_ice_volume(
                 src_path=SRC_PATH_FESOM,
                 mesh_diag_path=MESH_DIAG_PATH,
-                years=years,
+                year=year,
                 box=box,
                 savepath=DEST_PATH_SEA_ICE,
                 log=LOG
@@ -370,7 +366,7 @@ def run_postprocessing(year):
             so.fesom_sea_ice_extent(
                 src_path=SRC_PATH_FESOM,
                 mesh_diag_path=MESH_DIAG_PATH,
-                years=years,
+                year=year,
                 box=box,
                 savepath=DEST_PATH_SEA_ICE,
                 log=LOG
@@ -385,7 +381,7 @@ def run_postprocessing(year):
         so.fesom_iceberg_heatflux_vertical_integral(
             src_path=SRC_PATH_FESOM,
             dest_path=DEST_PATH_ICEBERG,
-            years=years,
+            year=year,
             log=LOG
         )
     
@@ -394,7 +390,7 @@ def run_postprocessing(year):
         so.fesom_total_iceberg_volume(
             src_path=SRC_PATH_FESOM,
             dest_path=DEST_PATH_ICEBERG,
-            years=years,
+            year=year,
             log=LOG
         )
     
@@ -403,15 +399,15 @@ def run_postprocessing(year):
         so.fesom_iceberg_combine_components(
             src_path=SRC_PATH_FESOM,
             dest_path=DEST_PATH_ICEBERG,
-            years=years,
+            year=year,
             log=LOG
         )
 
     if DO_ICEBERG_INTEGRATED_FLUXES:
         print("\n>>> Computing integrated iceberg fluxes...")
         # Load AAshelf mask for onshelf/offshelf
-        mask_ds = xr.open_dataset(MASK_FILES_REGION[0])
-        shelf_mask = mask_ds['zbar_n_bottom'].values
+        mask_ds = xr.open_dataset(MASK_FILE_SHELF)
+        shelf_mask = mask_ds['mask'].values
         onshelf_inds = np.where(shelf_mask > 0)[0]
         offshelf_inds = np.where(shelf_mask == 0)[0]
         
@@ -430,7 +426,7 @@ def run_postprocessing(year):
                     varname=v,
                     mask=m['inds'],
                     mask_name=m['name'],
-                    years=years,
+                    year=year,
                     log=LOG,
                     savepath=DEST_PATH_ICEBERG
                 )
@@ -465,9 +461,8 @@ def run_postprocessing(year):
     # -------------------------------------------------------------------------
     
     if DO_REGION_MEAN_PROFILE:
-        for mask_file in MASK_FILES_REGION:
-            for profile_config in DO_REGION_MEAN_PROFILE:
-                varname = profile_config['varname']
+        for mask_file in REGION_MEAN_PROFILE['regions']:
+            for varname in REGION_MEAN_PROFILE['varnames']:
                 print(f"\n>>> Computing region mean vertical profile for {varname} ({mask_file})...")
                 so.fesom_region_mean_vertical_profile(
                     src_path=SRC_PATH_FESOM,
@@ -475,7 +470,21 @@ def run_postprocessing(year):
                     mesh_diag_path=MESH_DIAG_PATH,
                     mask_file=mask_file,
                     varname=varname,
-                    years=years,
+                    year=year,
+                    log=LOG
+                )
+
+    if DO_REGION_ZONAL_MEAN_PROFILE:
+        for mask_file in REGION_MEAN_PROFILE['regions']:
+            for varname in REGION_MEAN_PROFILE['varnames']:
+                print(f"\n>>> Computing region zonal mean vertical profile for {varname} ({mask_file})...")
+                so.fesom_region_zonal_mean_vertical_profiles(
+                    src_path=SRC_PATH_FESOM,
+                    dest_path=DEST_PATH_REGION_AVG,
+                    mesh_diag_path=MESH_DIAG_PATH,
+                    mask_file=mask_file,
+                    varname=varname,
+                    year=year,
                     log=LOG
                 )
     

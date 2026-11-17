@@ -242,14 +242,14 @@ def read_iceberg_restart_file(icebergpath, unrotate=True):
 def fesom_iceberg_heatflux_vertical_integral(
     src_path,
     dest_path,
-    years=(1979, 2015),
+    year,
     log=True
 ):
     """
     Vertically integrate iceberg heat flux from 3D FESOM output.
 
-    For each grid node and time step, computes the vertical integral of the
-    iceberg heat flux (ibhf) using layer thickness as weights.
+    For the given year and each grid node and time step, computes the vertical
+    integral of the iceberg heat flux (ibhf) using layer thickness as weights.
 
     Parameters
     ----------
@@ -261,8 +261,8 @@ def fesom_iceberg_heatflux_vertical_integral(
         Output files are named `ibhf_vertint.fesom.{year}.nc`.
     mesh_diag_path : str
         Path to the directory containing `fesom.mesh.diag.nc`.
-    years : tuple of int, optional
-        Year range (start, end) to process. Default is (1979, 2015).
+    year : int
+        Year to process.
     log : bool, optional
         If True, print progress messages. Default is True.
 
@@ -273,7 +273,7 @@ def fesom_iceberg_heatflux_vertical_integral(
 
     Notes
     -----
-    - Existing output files are skipped (not overwritten).
+    - An existing output file is skipped (not overwritten).
     - Layer thickness is computed from mesh_diag.nz (depth levels).
     - The vertical integral sums ibhf * layer_thickness over all depth levels.
 
@@ -282,58 +282,54 @@ def fesom_iceberg_heatflux_vertical_integral(
     >>> fesom_iceberg_heatflux_vertical_integral(
     ...     src_path='/path/to/fesom/output/',
     ...     dest_path='/path/to/output/',
-    ...     mesh_diag_path='/path/to/mesh/',
-    ...     years=(2000, 2010)
+    ...     year=2000
     ... )
     """
+    output_file = f"{dest_path}ibhf_vertint.fesom.{year}.nc"
+    if isfile(output_file):
+        if log:
+            print(f"Skipping (exists): {output_file}", flush=True)
+        return
+
+    input_file = f"{src_path}ibhf.fesom.{year}.nc"
+    if not isfile(input_file):
+        if log:
+            print(f"Input file not found: {input_file}", flush=True)
+        return
+
     os.makedirs(dest_path, exist_ok=True)
-    
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-    
-    for year in range(years[0], years[-1] + 1):
-        input_file = f"{src_path}ibhf.fesom.{year}.nc"
-        output_file = f"{dest_path}ibhf_vertint.fesom.{year}.nc"
 
-        if isfile(output_file):
-            if log:
-                print(f"Skipping (exists): {output_file}", flush=True)
-            continue
+    if log:
+        print(f"Processing: {input_file}", flush=True)
 
-        if not isfile(input_file):
-            if log:
-                print(f"Input file not found: {input_file}", flush=True)
-            continue
+    ds = xr.open_dataset(input_file, decode_times=time_coder)
 
-        if log:
-            print(f"Processing: {input_file}", flush=True)
+    # Compute vertical integral over depth
+    vertint = ds['ibhf'].sum(dim='nz1')
 
-        ds = xr.open_dataset(input_file, decode_times=time_coder)
-        
-        # Compute vertical integral over depth
-        vertint = ds['ibhf'].sum(dim='nz1')
-
-        # Create output dataset
-        ds_out = xr.Dataset(
-            {
-                'ibhf': vertint.astype(np.float32),
-            },
-            attrs={
-                "description": f"Vertically integrated iceberg heat flux",
-                "source_file": input_file,
-            }
-        )
-        
-        ds_out['ibhf'].attrs = {
-            'long_name': 'vertically integrated iceberg heat flux',
-            'units': 'W/m^2',
+    # Create output dataset
+    ds_out = xr.Dataset(
+        {
+            'ibhf': vertint.astype(np.float32),
+        },
+        attrs={
+            "description": f"Vertically integrated iceberg heat flux",
+            "source_file": input_file,
         }
+    )
 
-        ds_out.to_netcdf(output_file)
-        if log:
-            print(f"Saved: {output_file}", flush=True)
+    ds_out['ibhf'].attrs = {
+        'long_name': 'vertically integrated iceberg heat flux',
+        'units': 'W/m^2',
+    }
 
-        ds.close()
-    
+    ds_out.to_netcdf(output_file)
+    if log:
+        print(f"Saved: {output_file}", flush=True)
+
+    ds.close()
+
     if log:
         print("Done.", flush=True)
 
@@ -341,13 +337,13 @@ def fesom_iceberg_heatflux_vertical_integral(
 def fesom_total_iceberg_volume(
     src_path,
     dest_path,
-    years=(1979, 2015),
+    year,
     log=True
 ):
     """
-    Compute total iceberg volume from buoys_track files.
+    Compute total iceberg volume from the buoys_track file of a single year.
 
-    Loads buoys_track*.nc files, adds proper time dimension (12-hourly data),
+    Loads the buoys_track*.nc file, adds proper time dimension (12-hourly data),
     resamples to monthly means, and computes total iceberg volume as
     sum(height * length^2) over all icebergs.
 
@@ -359,8 +355,8 @@ def fesom_total_iceberg_volume(
     dest_path : str
         Path to the directory where output files will be saved.
         Output files are named `icb_vol.fesom.{year}.nc`.
-    years : tuple of int, optional
-        Year range (start, end) to process. Default is (1979, 2015).
+    year : int
+        Year to process.
     log : bool, optional
         If True, print progress messages. Default is True.
 
@@ -371,7 +367,7 @@ def fesom_total_iceberg_volume(
 
     Notes
     -----
-    - Existing output files are skipped (not overwritten).
+    - An existing output file is skipped (not overwritten).
     - Data is assumed to be 12-hourly and is resampled to monthly means.
     - Volume is computed as height * length^2 (assuming square cross-section).
 
@@ -380,71 +376,68 @@ def fesom_total_iceberg_volume(
     >>> fesom_total_iceberg_volume(
     ...     src_path='/path/to/fesom/output/',
     ...     dest_path='/path/to/output/',
-    ...     years=(2000, 2010)
+    ...     year=2000
     ... )
     """
+    output_file = f"{dest_path}icb_vol.fesom.{year}.nc"
+    if isfile(output_file):
+        if log:
+            print(f"Skipping (exists): {output_file}", flush=True)
+        return
+
+    input_pattern = f"{src_path}buoys_track.nc_{year}0101-{year}1231"
+    input_files = glob.glob(input_pattern)
+    if not input_files:
+        if log:
+            print(f"Input file not found: {input_pattern}", flush=True)
+        return
+
     os.makedirs(dest_path, exist_ok=True)
-    
-    for year in range(years[0], years[-1] + 1):
-        input_pattern = f"{src_path}buoys_track.nc_{year}0101-{year}1231"
-        output_file = f"{dest_path}icb_vol.fesom.{year}.nc"
 
-        if isfile(output_file):
-            if log:
-                print(f"Skipping (exists): {output_file}", flush=True)
-            continue
+    if log:
+        print(f"Processing: {input_files[0]}", flush=True)
 
-        # Find matching files
-        input_files = glob.glob(input_pattern)
-        if not input_files:
-            if log:
-                print(f"Input file not found: {input_pattern}", flush=True)
-            continue
+    ds = xr.open_mfdataset(input_pattern, decode_times=False)
 
-        if log:
-            print(f"Processing: {input_files[0]}", flush=True)
+    # Add proper time dimension (12-hourly data)
+    ds['time'] = pd.date_range(f'{year}-01-01', f'{year}-12-31T23:59:00', freq='12h')
 
-        ds = xr.open_mfdataset(input_pattern, decode_times=False)
-        
-        # Add proper time dimension (12-hourly data)
-        ds['time'] = pd.date_range(f'{year}-01-01', f'{year}-12-31T23:59:00', freq='12h')
-        
-        # Resample to monthly means
-        ds_res = ds.resample(time='ME').mean()
-        
-        # Compute total iceberg volume: sum(height * length^2) over all icebergs
-        icb_vol = (ds_res.height * ds_res.length**2).sum(dim='number_tracer')
+    # Resample to monthly means
+    ds_res = ds.resample(time='ME').mean()
 
-        # Create output dataset
-        ds_out = xr.Dataset(
-            {
-                'icb_vol': icb_vol.astype(np.float32),
-            },
-            attrs={
-                "description": "Total iceberg volume (monthly means)",
-                "source_file": input_files[0],
-            }
-        )
-        
-        ds_out['icb_vol'].attrs = {
-            'long_name': 'total iceberg volume',
-            'units': 'm^3',
+    # Compute total iceberg volume: sum(height * length^2) over all icebergs
+    icb_vol = (ds_res.height * ds_res.length**2).sum(dim='number_tracer')
+
+    # Create output dataset
+    ds_out = xr.Dataset(
+        {
+            'icb_vol': icb_vol.astype(np.float32),
+        },
+        attrs={
+            "description": "Total iceberg volume (monthly means)",
+            "source_file": input_files[0],
         }
+    )
 
-        ds_out.to_netcdf(output_file)
-        if log:
-            print(f"Saved: {output_file}", flush=True)
+    ds_out['icb_vol'].attrs = {
+        'long_name': 'total iceberg volume',
+        'units': 'm^3',
+    }
 
-        ds.close()
-    
+    ds_out.to_netcdf(output_file)
+    if log:
+        print(f"Saved: {output_file}", flush=True)
+
+    ds.close()
+
     if log:
         print("Done.", flush=True)
 
 
-def fesom_iceberg_combine_components(src_path, dest_path, years=(1979, 2015), log=True):
+def fesom_iceberg_combine_components(src_path, dest_path, year, log=True):
     """
     Combine iceberg freshwater flux components (ibfwb, ibfwbv, ibfwe, ibfwl) 
-    into a single ibfw file per year.
+    into a single ibfw file for one year.
 
     Parameters
     ----------
@@ -452,69 +445,68 @@ def fesom_iceberg_combine_components(src_path, dest_path, years=(1979, 2015), lo
         Directory containing the annual FESOM iceberg component files 
         (e.g., ibfwb.fesom.<year>.nc).
     dest_path : str
-        Directory where the combined ibfw files will be saved.
-    years : tuple of int, default (1979, 2015)
-        Start and end years (inclusive) to process.
+        Directory where the combined ibfw file will be saved.
+    year : int
+        Year to process.
     log : bool, default True
         If True, print progress messages.
 
     Returns
     -------
     None
-        Results are saved as NetCDF files named `ibfw.fesom.<year>.nc`.
+        Results are saved as a NetCDF file named `ibfw.fesom.<year>.nc`.
     """
+    outfile = f"{dest_path}ibfw.fesom.{year}.nc"
+    if isfile(outfile):
+        if log:
+            print(f"Skipping (exists): {outfile}", flush=True)
+        return
+
     os.makedirs(dest_path, exist_ok=True)
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-    
-    for year in range(years[0], years[-1] + 1):
-        outfile = f"{dest_path}ibfw.fesom.{year}.nc"
-        if isfile(outfile):
-            if log:
-                print(f"Skipping (exists): {outfile}", flush=True)
+
+    components = ['ibfwb', 'ibfwbv', 'ibfwe', 'ibfwl']
+    ds_sum = None
+
+    found_any = False
+    for comp in components:
+        infile = f"{src_path}{comp}.fesom.{year}.nc"
+        if not isfile(infile):
             continue
-            
-        components = ['ibfwb', 'ibfwbv', 'ibfwe', 'ibfwl']
-        ds_sum = None
-        
-        found_any = False
-        for comp in components:
-            infile = f"{src_path}{comp}.fesom.{year}.nc"
-            if not isfile(infile):
-                continue
-            
-            found_any = True
-            ds = xr.open_dataset(infile, decode_times=time_coder)
-            if ds_sum is None:
-                ds_sum = ds.copy()
-                ds_sum = ds_sum.rename({comp: 'ibfw'})
-            else:
-                ds_sum['ibfw'] = ds_sum['ibfw'] + ds[comp]
-            ds.close()
-            
-        if found_any and ds_sum is not None:
-            ds_sum['ibfw'].attrs = {
-                'long_name': 'total iceberg freshwater flux',
-                'units': 'm/s',
-                'description': 'Sum of ibfwb, ibfwbv, ibfwe, and ibfwl'
-            }
-            ds_sum.to_netcdf(outfile)
-            if log:
-                print(f"Saved: {outfile}", flush=True)
-            ds_sum.close()
+
+        found_any = True
+        ds = xr.open_dataset(infile, decode_times=time_coder)
+        if ds_sum is None:
+            ds_sum = ds.copy()
+            ds_sum = ds_sum.rename({comp: 'ibfw'})
+        else:
+            ds_sum['ibfw'] = ds_sum['ibfw'] + ds[comp]
+        ds.close()
+
+    if found_any and ds_sum is not None:
+        ds_sum['ibfw'].attrs = {
+            'long_name': 'total iceberg freshwater flux',
+            'units': 'm/s',
+            'description': 'Sum of ibfwb, ibfwbv, ibfwe, and ibfwl'
+        }
+        ds_sum.to_netcdf(outfile)
+        if log:
+            print(f"Saved: {outfile}", flush=True)
+        ds_sum.close()
 
 
 def fesom_iceberg_integrated_flux(
     src_path, 
     mesh_diag_path, 
+    year,
     varname='ibfw', 
     mask=None, 
     mask_name='global',
-    years=(1979, 2015), 
     log=True, 
     savepath='./'
 ):
     """
-    Compute and save integrated iceberg flux (freshwater or heat) time series.
+    Compute and save integrated iceberg flux (freshwater or heat) time series for one year.
 
     Integrates the specified flux variable over all nodes or a subset of nodes 
     defined by a mask. The flux is multiplied by the nodal area before summing.
@@ -525,6 +517,8 @@ def fesom_iceberg_integrated_flux(
         Directory containing the annual FESOM output files.
     mesh_diag_path : str
         Directory containing `fesom.mesh.diag.nc` for nodal areas.
+    year : int
+        Year to process.
     varname : str, default 'ibfw'
         Variable name to integrate (e.g., 'ibfw', 'ibhf').
     mask : array-like, optional
@@ -532,8 +526,6 @@ def fesom_iceberg_integrated_flux(
         regional integration. If None, computes global integration.
     mask_name : str, default 'global'
         Descriptive name of the mask used in the output filename.
-    years : tuple of int, default (1979, 2015)
-        Start and end years (inclusive) to process.
     log : bool, default True
         If True, print progress messages.
     savepath : str, default './'
@@ -542,59 +534,56 @@ def fesom_iceberg_integrated_flux(
     Returns
     -------
     None
-        Results are saved as NetCDF files named `iceberg_<varname>_<mask_name>.<year>.nc`.
+        Results are saved as a NetCDF file named `iceberg_<varname>_<mask_name>.<year>.nc`.
     """
+    outfile = f"{savepath}iceberg_{varname}_{mask_name}.{year}.nc"
+    if isfile(outfile):
+        if log:
+            print(f"Skipping (exists): {outfile}", flush=True)
+        return
+
+    infile = f"{src_path}{varname}.fesom.{year}.nc"
+    if not isfile(infile):
+        return
+
     os.makedirs(savepath, exist_ok=True)
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-    
+
     mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
     nod_area = mesh_diag.nod_area.max(dim='nz')
-    
-    for year in range(years[0], years[-1] + 1):
-        infile = f"{src_path}{varname}.fesom.{year}.nc"
-        outfile = f"{savepath}iceberg_{varname}_{mask_name}.{year}.nc"
-        
-        if isfile(outfile):
-            if log:
-                print(f"Skipping (exists): {outfile}", flush=True)
-            continue
-            
-        if not isfile(infile):
-            continue
-            
-        if log:
-            print(f"Integrating {varname} ({mask_name}) for {year}...", flush=True)
-            
-        ds = xr.open_dataset(infile, decode_times=time_coder)
-        data = ds[varname]
-        
-        # Handle vertical dimension if present
-        if 'nz1' in data.dims:
-            data = data.sum(dim='nz1')
-        elif 'nz' in data.dims:
-            data = data.sum(dim='nz')
-            
-        if mask is not None:
-            integrated = (data * nod_area).isel(nod2=mask).sum(dim='nod2')
-        else:
-            integrated = (data * nod_area).sum(dim='nod2')
-            
-        ds_out = xr.Dataset(
-            {
-                f"{varname}_integrated": integrated.astype(np.float32),
-            },
-            attrs={
-                "description": f"Integrated iceberg {varname} ({mask_name})",
-                "source_file": infile,
-                "mask_name": mask_name,
-            }
-        )
-        
-        ds_out.to_netcdf(outfile)
-        if log:
-            print(f"Saved: {outfile}", flush=True)
-        ds.close()
-    
+
+    if log:
+        print(f"Integrating {varname} ({mask_name}) for {year}...", flush=True)
+
+    ds = xr.open_dataset(infile, decode_times=time_coder)
+    data = ds[varname]
+
+    # Handle vertical dimension if present
+    if 'nz1' in data.dims:
+        data = data.sum(dim='nz1')
+    elif 'nz' in data.dims:
+        data = data.sum(dim='nz')
+
+    if mask is not None:
+        integrated = (data * nod_area).isel(nod2=mask).sum(dim='nod2')
+    else:
+        integrated = (data * nod_area).sum(dim='nod2')
+
+    ds_out = xr.Dataset(
+        {
+            f"{varname}_integrated": integrated.astype(np.float32),
+        },
+        attrs={
+            "description": f"Integrated iceberg {varname} ({mask_name})",
+            "source_file": infile,
+            "mask_name": mask_name,
+        }
+    )
+
+    ds_out.to_netcdf(outfile)
+    if log:
+        print(f"Saved: {outfile}", flush=True)
+    ds.close()
     mesh_diag.close()
 
 
