@@ -160,7 +160,6 @@ def run_postprocessing(year):
                  DEST_PATH_DEPTH_EXTRACT, DEST_PATH_REGION_AVG]:
         os.makedirs(path, exist_ok=True)
     
-    years = (year, year)  # Process single year
     
     # -------------------------------------------------------------------------
     # Ocean processing
@@ -172,7 +171,7 @@ def run_postprocessing(year):
             src_path=SRC_PATH_FESOM,
             dest_path=DEST_PATH_BOTTOM,
             varname='temp',
-            years=years,
+            year=year,
             log=LOG
         )
     
@@ -182,7 +181,7 @@ def run_postprocessing(year):
             src_path=SRC_PATH_FESOM,
             dest_path=DEST_PATH_BOTTOM,
             varname='salt',
-            years=years,
+            year=year,
             log=LOG
         )
     
@@ -192,7 +191,7 @@ def run_postprocessing(year):
             src_path=SRC_PATH_FESOM,
             dest_path=DEST_PATH_BOTTOM,
             varname='sigma0',
-            years=years,
+            year=year,
             log=LOG
         )
     
@@ -206,7 +205,7 @@ def run_postprocessing(year):
                     mesh_diag_path=MESH_DIAG_PATH,
                     varname=varname,
                     depth_range=(depth_ceil, depth_floor),
-                    years=years,
+                    year=year,
                     log=LOG
                 )
     
@@ -216,7 +215,7 @@ def run_postprocessing(year):
             src_path=SRC_PATH_FESOM,
             mesh_diag_path=MESH_DIAG_PATH,
             meshpath=MESH_PATH,
-            years=years,
+            year=year,
             mask=KE_MASK,
             log=LOG,
             savepath=DEST_PATH_KE
@@ -232,7 +231,7 @@ def run_postprocessing(year):
                     mesh_diag_path=MESH_DIAG_PATH,
                     varname=varname,
                     depth=depth,
-                    years=years,
+                    year=year,
                     log=LOG
                 )
     
@@ -253,7 +252,7 @@ def run_postprocessing(year):
                 mesh_diag_path=MESH_DIAG_PATH,
                 mesh_path=MESH_PATH,
                 mask=cavity_mask,
-                years=years,
+                year=year,
                 log=LOG,
                 savepath=DEST_PATH_SUBSHELF
             )
@@ -265,7 +264,7 @@ def run_postprocessing(year):
                 mesh_diag_path=MESH_DIAG_PATH,
                 mesh_path=MESH_PATH,
                 mask=cavity_mask,
-                years=years,
+                year=year,
                 log=LOG,
                 savepath=DEST_PATH_SUBSHELF
             )
@@ -277,7 +276,7 @@ def run_postprocessing(year):
                 mesh_diag_path=MESH_DIAG_PATH,
                 mesh_path=MESH_PATH,
                 mask=cavity_mask,
-                years=years,
+                year=year,
                 variable='temp',
                 mean=True,
                 log=LOG,
@@ -291,7 +290,7 @@ def run_postprocessing(year):
                 mesh_diag_path=MESH_DIAG_PATH,
                 mesh_path=MESH_PATH,
                 mask=cavity_mask,
-                years=years,
+                year=year,
                 variable='salt',
                 mean=True,
                 log=LOG,
@@ -329,7 +328,7 @@ def run_postprocessing(year):
             so.fesom_sea_ice_area(
                 src_path=SRC_PATH_FESOM_PREPROCESSED,
                 mesh_diag_path=MESH_DIAG_PATH,
-                years=years,
+                year=year,
                 box=box,
                 savepath=DEST_PATH_SEA_ICE,
                 log=LOG
@@ -341,7 +340,7 @@ def run_postprocessing(year):
             so.fesom_sea_ice_volume(
                 src_path=SRC_PATH_FESOM_PREPROCESSED,
                 mesh_diag_path=MESH_DIAG_PATH,
-                years=years,
+                year=year,
                 box=box,
                 savepath=DEST_PATH_SEA_ICE,
                 log=LOG
@@ -353,7 +352,7 @@ def run_postprocessing(year):
             so.fesom_sea_ice_extent(
                 src_path=SRC_PATH_FESOM_PREPROCESSED,
                 mesh_diag_path=MESH_DIAG_PATH,
-                years=years,
+                year=year,
                 box=box,
                 savepath=DEST_PATH_SEA_ICE,
                 log=LOG
@@ -373,7 +372,7 @@ def run_postprocessing(year):
                     mesh_diag_path=MESH_DIAG_PATH,
                     mask_file=mask_file,
                     varname=varname,
-                    years=years,
+                    year=year,
                     log=LOG
                 )
 
@@ -387,7 +386,7 @@ def run_postprocessing(year):
                     mesh_diag_path=MESH_DIAG_PATH,
                     mask_file=mask_file,
                     varname=varname,
-                    years=years,
+                    year=year,
                     log=LOG
                 )
         
