@@ -157,17 +157,17 @@ def fesom_sea_ice_volume(
     Compute and save total sea ice volume time series from FESOM2 output within a specified
     geographic bounding box.
 
-    This function loads sea ice concentration (`a_ice`) and thickness (`m_ice`) variables
-    from the FESOM2 output files of a single year, and calculates the sea ice volume by
-    summing the product of sea ice thickness, concentration, and nodal area over the nodes
-    that fall within a user-defined geographic region. One output file is written per
-    year. If the output file already exists, the function returns immediately without loading any data.
+    This function loads the sea ice volume per unit grid-cell area (`m_ice`) from the FESOM2
+    output of a single year, and calculates the sea ice volume by summing the product of
+    `m_ice` and nodal area over the nodes that fall within a user-defined geographic region.
+    One output file is written per year. If the output file already exists, the function
+    returns immediately without loading any data.
 
     Parameters
     ----------
     src_path : str
         Path to the directory containing FESOM2 output NetCDF files named
-        `a_ice.fesom.{year}.nc` and `m_ice.fesom.{year}.nc`.
+        `m_ice.fesom.{year}.nc`.
     mesh_diag_path : str
         Path to the directory containing the mesh diagnostic file `fesom.mesh.diag.nc`,
         which provides nodal coordinates and areas.
@@ -192,7 +192,11 @@ def fesom_sea_ice_volume(
     -----
     Sea ice volume is calculated as:
 
-        sea_ice_volume = sum_over_nodes(area * m_ice * a_ice)
+        sea_ice_volume = sum_over_nodes(area * m_ice)
+
+    FESOM2 defines `m_ice` as ice volume per unit grid-cell area (`h_ice * a_ice`), so the
+    concentration `a_ice` must not be applied again. This matches the model's own sivoln/sivols
+    diagnostics.
     """
 
     def format_lat(lat):
@@ -227,8 +231,7 @@ def fesom_sea_ice_volume(
 
     # Open files with cftime decoder
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-    files2load = [f"{src_path}a_ice.fesom.{year}.nc", f"{src_path}m_ice.fesom.{year}.nc"]
-    ds = xr.open_mfdataset(files2load, decode_times=time_coder, chunks={"time": 12})
+    ds = xr.open_mfdataset([f"{src_path}m_ice.fesom.{year}.nc"], decode_times=time_coder, chunks={"time": 12})
     if 'nz' in ds.dims:
         ds = ds.isel(nz=0)
         ds = ds.drop_vars('nz')
@@ -237,11 +240,10 @@ def fesom_sea_ice_volume(
     ds_cropped = ds.isel(nod2=inds)
     mesh_diag_cropped = mesh_diag.isel(nod2=inds, nz=0)
 
-    # Compute total ice volume time series (nodal area * nodal ice height * nodal ice concentration)
+    # Compute total ice volume time series (nodal area * nodal ice volume per unit area)
     sea_ice_volume = (
         mesh_diag_cropped.nod_area
         * ds_cropped.m_ice
-        * ds_cropped.a_ice
     ).sum(dim="nod2")
 
     # Create output dataset
