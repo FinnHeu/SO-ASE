@@ -96,6 +96,7 @@ DEST_PATH_REGION_AVG = DEST_PATH_BASE + "region_averages/"
 
 # KML path for regional masks (cavity processing)
 KML_PATH = os.path.expanduser("~/python_modules/SO-ASE/files/kml/")
+MASK_PATH_ICE_SHELVES = MESH_PATH + "masks/ice_shelves/"
 
 # ============================================================================
 #                         PROCESSING PARAMETERS
@@ -131,15 +132,15 @@ SEA_ICE_BOXES = [
 # List of all cavity masks to process (set to empty list [] to skip regional processing)
 # Note: kml_path should be the directory, not the full file path (filename is built from name)
 CAVITY_MASKS = [
-    {'name': 'all'},  # All cavities combined
-    {'name': 'AmeryIceShelf', 'kml_path': KML_PATH},
-    {'name': 'WestIndianOcean', 'kml_path': KML_PATH},
-    {'name': 'EastIndianOcean', 'kml_path': KML_PATH},
-    {'name': 'FilchnerRonneIceShelf', 'kml_path': KML_PATH},
-    {'name': 'RossSea', 'kml_path': KML_PATH},
-    {'name': 'AmundsenSea', 'kml_path': KML_PATH},
-    {'name': 'BellingshausenSea', 'kml_path': KML_PATH},
-    {'name': 'WeddellSea', 'kml_path': KML_PATH}  
+    {'name': 'all', 'prep_mask_path': MASK_PATH_ICE_SHELVES},  # All cavities combined
+    {'name': 'AmeryIceShelf', 'kml_path': KML_PATH, 'prep_mask_path': MASK_PATH_ICE_SHELVES},
+    {'name': 'WestIndianOcean', 'kml_path': KML_PATH, 'prep_mask_path': MASK_PATH_ICE_SHELVES},
+    {'name': 'EastIndianOcean', 'kml_path': KML_PATH, 'prep_mask_path': MASK_PATH_ICE_SHELVES},
+    {'name': 'FilchnerRonneIceShelf', 'kml_path': KML_PATH, 'prep_mask_path': MASK_PATH_ICE_SHELVES},
+    {'name': 'RossSea', 'kml_path': KML_PATH, 'prep_mask_path': MASK_PATH_ICE_SHELVES},
+    {'name': 'AmundsenSea', 'kml_path': KML_PATH, 'prep_mask_path': MASK_PATH_ICE_SHELVES},
+    {'name': 'BellingshausenSea', 'kml_path': KML_PATH, 'prep_mask_path': MASK_PATH_ICE_SHELVES},
+    {'name': 'WeddellSea', 'kml_path': KML_PATH, 'prep_mask_path': MASK_PATH_ICE_SHELVES}  
 ]
 
 # Kinetic energy mask ('all', 'cavity', 'open_ocean')
