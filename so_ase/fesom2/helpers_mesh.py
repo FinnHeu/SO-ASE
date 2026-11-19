@@ -5,6 +5,7 @@ import numpy as np
 import shapely.geometry as sh
 import shapely
 import math
+import os
 
 from scipy.spatial import cKDTree
 from pyproj import Proj, Transformer
@@ -545,6 +546,39 @@ def build_cavity_regional_mask(meshpath, kml_path, name='Filchner-Ronne', which=
                 mask_region[i] = False
 
     return mask_region
+
+def get_node_mask(meshpath, mask):
+    """
+    Returns a boolean node mask from a mask specification. If the mask dict contains
+    'prep_mask_path', a pre-computed mask file ``<prep_mask_path><name>.nc`` (variable
+    'mask' on nod2) is used when it exists and matches the mesh node count. Otherwise
+    the mask is generated from the mesh.
+
+    Parameters:
+        meshpath (str): Path to the directory containing mesh files.
+        mask (dict or array-like): Dict with 'name' (and 'kml_path' for regional masks,
+            optional 'prep_mask_path'), or an array-like node mask which is returned as is.
+    Returns:
+        array of bool: Node mask.
+    """
+    if isinstance(mask, dict):
+        prep_mask_path = mask.get('prep_mask_path')
+        if prep_mask_path:
+            prep_file = f"{prep_mask_path}{mask['name']}.nc"
+            if os.path.isfile(prep_file):
+                with xr.open_dataset(prep_file) as ds:
+                    node_mask = ds['mask'].values.astype(bool)
+                with open(f'{meshpath}nod2d.out', 'r') as f:
+                    num_nodes = int(f.readline())
+                if node_mask.size == num_nodes:
+                    return node_mask
+                print(f"Warning: {prep_file} has {node_mask.size} nodes, mesh has {num_nodes}. Generating mask instead.")
+        if mask['name'] == 'all':
+            return build_cavity_mask(meshpath, which='node')
+        return build_cavity_regional_mask(meshpath, mask['kml_path'], name=mask['name'], which='node')
+    if isinstance(mask, (list, np.ndarray)):
+        return mask
+    raise ValueError('Mask type is not supported!')
 
 def build_regional_mask(meshpath, kml_file, which='node', close_ring=True, polar='south'):
     """

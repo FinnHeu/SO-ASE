@@ -5,7 +5,7 @@ import xarray as xr
 import numpy as np
 import glob
 from os.path import isfile
-from .helpers_mesh import build_cavity_mask, build_cavity_regional_mask, get_first_active_layer_area
+from .helpers_mesh import get_node_mask, get_first_active_layer_area
 from ..miscellaneous.helpers_misc import seconds_per_month
 
 def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, mask, year, log=False, savepath='./'):
@@ -31,10 +31,10 @@ def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, mask, yea
         Path to the FESOM mesh directory (used for building the cavity mask).
     mask : dict or array-like
         Identifier for which ocean cavity mask to apply.  
-        If ``dict['name'] == 'all'`` is given, the mask is generated using 
-        ``build_cavity_mask(mesh_path, which='node')``.  
-        If ``dict['name'] == 'Amery'`` is given a .kml file called ``Amery.kml`` 
-        will be loaded from ``dict['kml_path']`` from which the boolean mask will be generated.
+        If ``dict['name'] == 'all'`` is given, the mask covers all cavities.
+        Otherwise a regional mask is built from ``<dict['kml_path']><name>.kml``.
+        If ``dict['prep_mask_path']`` is given and ``<prep_mask_path><name>.nc`` exists,
+        the pre-computed mask is loaded from that file instead of being generated.
         If an array-like mask is supplied, it is used directly for ``isel``.
     year : int
         Year to process.
@@ -57,15 +57,7 @@ def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, mask, yea
 
     # Build mask
     mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
-    if isinstance(mask, dict):
-        if mask['name'] == 'all':
-            node_mask = build_cavity_mask(mesh_path, which='node')
-        else:
-            node_mask = build_cavity_regional_mask(mesh_path, mask['kml_path'], name=mask['name'], which='node')
-    elif isinstance(mask, list) or isinstance(mask, np.array):
-        node_mask = mask
-    else:
-        raise ValueError('Mask type is not supported!')
+    node_mask = get_node_mask(mesh_path, mask)
 
     # Open file with cftime decoder
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
@@ -127,10 +119,10 @@ def fesom_subshelf_heatflux(src_path, mesh_diag_path, mesh_path, mask, year, log
         cavity mask.
     mask : dict or array-like
         Identifier for which ocean cavity mask to apply.  
-        If ``dict['name'] == 'all'`` is given, the mask is generated using 
-        ``build_cavity_mask(mesh_path, which='node')``.  
-        If ``dict['name'] == 'Amery'`` is given a .kml file called ``Amery.kml`` 
-        will be loaded from ``dict['kml_path']`` from which the boolean mask will be generated.
+        If ``dict['name'] == 'all'`` is given, the mask covers all cavities.
+        Otherwise a regional mask is built from ``<dict['kml_path']><name>.kml``.
+        If ``dict['prep_mask_path']`` is given and ``<prep_mask_path><name>.nc`` exists,
+        the pre-computed mask is loaded from that file instead of being generated.
         If an array-like mask is supplied, it is used directly for ``isel``.
     year : int
         Year to process.
@@ -164,15 +156,7 @@ def fesom_subshelf_heatflux(src_path, mesh_diag_path, mesh_path, mask, year, log
     mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
 
     # Build mask
-    if isinstance(mask, dict):
-        if mask['name'] == 'all':
-            node_mask = build_cavity_mask(mesh_path, which='node')
-        else:
-            node_mask = build_cavity_regional_mask(mesh_path, mask['kml_path'], name=mask['name'], which='node')
-    elif isinstance(mask, list) or isinstance(mask, np.array):
-        node_mask = mask
-    else:
-        raise ValueError('Mask type is not supported!')
+    node_mask = get_node_mask(mesh_path, mask)
 
     # Open file with cftime decoder
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
@@ -383,6 +367,8 @@ def fesom_subshelf_hydrography(src_path, mesh_diag_path, mesh_path, mask, year, 
             * If ``mask['name'] == 'all'``: use the full cavity mask.
             * Otherwise: use a regional mask defined by a KML file
               provided in ``mask['kml_path']``.
+        - If ``mask['prep_mask_path']`` is set and ``<prep_mask_path><name>.nc`` exists,
+          the pre-computed mask is loaded from that file instead of being generated.
         - If a **list** or **np.array**, it is interpreted as a boolean or
           integer mask directly indexable along the ``nod2`` dimension.
     year : int
@@ -418,18 +404,7 @@ def fesom_subshelf_hydrography(src_path, mesh_diag_path, mesh_path, mask, year, 
     os.makedirs(savepath, exist_ok=True)
 
     # --- Build mask ---
-    if isinstance(mask, dict):
-        if mask['name'] == 'all':
-            node_mask = build_cavity_mask(mesh_path, which='node')
-        else:
-            node_mask = build_cavity_regional_mask(
-                mesh_path, mask['kml_path'],
-                name=mask['name'], which='node'
-            )
-    elif isinstance(mask, (list, np.ndarray)):
-        node_mask = mask
-    else:
-        raise ValueError('Mask type is not supported!')
+    node_mask = get_node_mask(mesh_path, mask)
 
     # --- Load mesh diag once ---
     mesh_diag = xr.open_dataset(f"{mesh_diag_path}fesom.mesh.diag.nc")
