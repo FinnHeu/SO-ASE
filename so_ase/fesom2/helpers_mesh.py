@@ -521,6 +521,8 @@ def build_cavity_regional_mask(meshpath, kml_path, name='Filchner-Ronne', which=
     elif which == 'element':
         elem = read_elements(meshpath)
         node_lon, node_lat, node_idx, node_coast = read_nodes(meshpath)
+        if name == 'RossSea':
+            node_lon = lon_to_360(node_lon)
         lon, lat  = node_lon[elem].mean(axis=1), node_lat[elem].mean(axis=1)
         lev_cav = read_element_levels(meshpath, which='cavity', raw=False, python_indexing=False)
         mask_cavity = lev_cav > 1
@@ -530,7 +532,7 @@ def build_cavity_regional_mask(meshpath, kml_path, name='Filchner-Ronne', which=
     kml_file = f"{kml_path}{name}.kml"        
     coords = read_kml_coords(kml_file, close_ring=True)
 
-    if name == 'Ross':
+    if name == 'RossSea':
         lon = lon_to_360(lon)
     #    coords = [(i+360, j) for i, j in coords if i < 0]
         
