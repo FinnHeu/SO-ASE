@@ -5,7 +5,7 @@ import xarray as xr
 import numpy as np
 import glob
 from os.path import isfile
-from .helpers_mesh import build_cavity_mask, build_cavity_regional_mask
+from .helpers_mesh import build_cavity_mask, build_cavity_regional_mask, get_first_active_layer_area
 from ..miscellaneous.helpers_misc import seconds_per_month
 
 def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, mask, year, log=False, savepath='./'):
@@ -72,7 +72,7 @@ def fesom_subshelf_freshwaterflux(src_path, mesh_diag_path, mesh_path, mask, yea
     ds_fw = xr.open_mfdataset([f"{src_path}fw.fesom.{year}.nc"], decode_times=time_coder, chunks={"time": 12})
 
     # Compute subshelf melt
-    SSM = (ds_fw.fw * mesh_diag.nod_area.max(dim='nz')).isel(nod2=node_mask).sum(dim='nod2')
+    SSM = (ds_fw.fw * get_first_active_layer_area(mesh_diag)).isel(nod2=node_mask).sum(dim='nod2')
 
     # Create output dataset
     ds_out = xr.Dataset(
@@ -179,7 +179,7 @@ def fesom_subshelf_heatflux(src_path, mesh_diag_path, mesh_path, mask, year, log
     ds_fh = xr.open_mfdataset([f"{src_path}fh.fesom.{year}.nc"], decode_times=time_coder, chunks={"time": 12})
 
     # Compute subshelf heatflux
-    SSHF = (ds_fh.fh * mesh_diag.nod_area.max(dim='nz')).isel(nod2=node_mask).sum(dim='nod2')
+    SSHF = (ds_fh.fh * get_first_active_layer_area(mesh_diag)).isel(nod2=node_mask).sum(dim='nod2')
 
     # Create output dataset
     ds_out = xr.Dataset(

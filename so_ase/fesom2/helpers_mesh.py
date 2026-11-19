@@ -842,6 +842,23 @@ def add_element_volumes(mesh_diag):
     mesh_diag['elem_volume'] = mesh_diag.elem_area * mesh_diag.layer_thickness
     return mesh_diag
 
+def get_first_active_layer_area(mesh_diag):
+    """
+    Returns the horizontal area of the first active (non-zero) layer of each node.
+    For nodes below an ice shelf this is the cavity/ocean interface layer, which
+    can be smaller than the maximum area over depth.
+
+    Parameters:
+        mesh_diag (xarray.Dataset): Dataset containing 'nod_area' with dims (nz, nod2).
+    Returns:
+        xarray.DataArray: Area of the first active layer for each node (dims: nod2).
+                          Nodes without any active layer get zero area.
+    """
+    area = mesh_diag.nod_area
+    active = area > 0
+    first_active = active & (active.cumsum(dim='nz') == 1)
+    return area.where(first_active, 0).sum(dim='nz')
+
 ###--------> 6. Interpolation/Extrapolation
 def build_spherical_nn_mapper(lon_source, lat_source,
                               lon_target, lat_target):
