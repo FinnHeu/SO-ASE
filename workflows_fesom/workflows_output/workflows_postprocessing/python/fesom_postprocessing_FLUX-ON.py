@@ -52,6 +52,11 @@ DO_FRESHWATERFLUX_TO_GTM = True
 DO_SUBSHELF_HYDROGRAPHY_TEMP = True
 DO_SUBSHELF_HYDROGRAPHY_SALT = True
 
+# Antarctic snowfall processing
+DO_ANTARCTIC_SNOWFALL_FLUX = True
+DO_SNOWFALL_FLUX_TO_GTY = True
+DO_SNOWFALL_FLUX_TO_GTM = True
+
 # Iceberg processing
 DO_ICEBERG_HEATFLUX = True
 DO_ICEBERG_VOLUME = True
@@ -92,6 +97,9 @@ DEST_PATH_DEPTH_EXTRACT = DEST_PATH_BASE + "depth_extracts/"
 DEST_PATH_ICEBERG = DEST_PATH_BASE + "iceberg/"
 DEST_PATH_ICEBERG_GTY = DEST_PATH_BASE + "iceberg_gty/"
 DEST_PATH_ICEBERG_GTM = DEST_PATH_BASE + "iceberg_gtm/"
+DEST_PATH_SNOWFALL = DEST_PATH_BASE + "snowfall/"
+DEST_PATH_SNOWFALL_GTY = DEST_PATH_BASE + "snowfall_gty/"
+DEST_PATH_SNOWFALL_GTM = DEST_PATH_BASE + "snowfall_gtm/"
 DEST_PATH_REGION_AVG = DEST_PATH_BASE + "region_averages/"
 
 # KML path for regional masks (cavity processing)
@@ -172,7 +180,8 @@ def run_postprocessing(year):
                  DEST_PATH_SUBSHELF_GTY, DEST_PATH_SUBSHELF_GTM,
                  DEST_PATH_SUBSHELF_HYDRO, DEST_PATH_SEA_ICE, DEST_PATH_DEPTH_AVG,
                  DEST_PATH_DEPTH_EXTRACT, DEST_PATH_ICEBERG, DEST_PATH_REGION_AVG,
-                 DEST_PATH_ICEBERG_GTY, DEST_PATH_ICEBERG_GTM]:
+                 DEST_PATH_ICEBERG_GTY, DEST_PATH_ICEBERG_GTM,
+                 DEST_PATH_SNOWFALL, DEST_PATH_SNOWFALL_GTY, DEST_PATH_SNOWFALL_GTM]:
         os.makedirs(path, exist_ok=True)
     
     
@@ -333,6 +342,40 @@ def run_postprocessing(year):
             log=LOG
         )
     
+    # -------------------------------------------------------------------------
+    # Antarctic snowfall processing
+    # -------------------------------------------------------------------------
+
+    if DO_ANTARCTIC_SNOWFALL_FLUX:
+        print("\n>>> Computing Antarctic snowfall freshwater flux...")
+        so.fesom_antarctic_snowfall_flux(
+            src_path=SRC_PATH_FESOM,
+            mesh_diag_path=MESH_DIAG_PATH,
+            year=year,
+            savepath=DEST_PATH_SNOWFALL,
+            log=LOG
+        )
+
+    if DO_SNOWFALL_FLUX_TO_GTY:
+        print("\n>>> Converting snowfall flux to Gt/yr...")
+        so.snowfall_flux_to_massflux_Gty(
+            src_path=DEST_PATH_SNOWFALL,
+            dst_path=DEST_PATH_SNOWFALL_GTY,
+            rho_fw=1000,
+            year=year,
+            log=LOG
+        )
+
+    if DO_SNOWFALL_FLUX_TO_GTM:
+        print("\n>>> Converting snowfall flux to Gt/month...")
+        so.snowfall_flux_to_massflux_Gtm(
+            src_path=DEST_PATH_SNOWFALL,
+            dst_path=DEST_PATH_SNOWFALL_GTM,
+            rho_fw=1000,
+            year=year,
+            log=LOG
+        )
+
     # -------------------------------------------------------------------------
     # Sea ice processing
     # -------------------------------------------------------------------------
