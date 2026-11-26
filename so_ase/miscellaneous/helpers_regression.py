@@ -4,7 +4,6 @@ import xarray as xr
 import numpy as np
 from scipy.stats import linregress
 from scipy.interpolate import griddata
-from so_ase.fesom2.helpers_mesh import find_nodes_in_box
 from so_ase.reanalysis import reproject_to_latlon
 
 def regression2D_fesom(src_path, mesh_diag_path, years=(2011, 2024), box=[-180, 180, -65, -55], depth=None, varname='a_ice', grouping='annual.mean', grid_data=True, log=True):
@@ -61,6 +60,7 @@ def regression2D_fesom(src_path, mesh_diag_path, years=(2011, 2024), box=[-180, 
     """
     files2open = [f'{src_path}{varname}.fesom.{y}.nc' for y in range(years[0], years[-1])]
     
+    from so_ase.fesom2.helpers_mesh import find_nodes_in_box
     inds = find_nodes_in_box(mesh_diag_path, box)
 
     # Open files with cftime decoder
@@ -444,6 +444,7 @@ def anomaly2D_fesom(src_path, mesh_diag_path, ref_period=(2011, 2024), box=[-180
     
     files2open = [f'{src_path}{varname}.fesom.{y}.nc' for y in range(ref_period[0], ref_period[-1])]
     
+    from so_ase.fesom2.helpers_mesh import find_nodes_in_box
     inds = find_nodes_in_box(mesh_diag_path, box)
 
     # Open files with cftime decoder
