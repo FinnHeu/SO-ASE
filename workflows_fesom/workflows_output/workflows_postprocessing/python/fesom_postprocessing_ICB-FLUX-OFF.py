@@ -146,6 +146,7 @@ CAVITY_MASKS = [
     {'name': 'FilchnerRonneIceShelf', 'kml_path': KML_PATH, 'prep_mask_path': MASK_PATH_ICE_SHELVES},
     {'name': 'EastIndianOcean', 'kml_path': KML_PATH, 'prep_mask_path': MASK_PATH_ICE_SHELVES},
     {'name': 'RossSea', 'kml_path': KML_PATH, 'prep_mask_path': MASK_PATH_ICE_SHELVES},
+    {'name': 'RossShelf', 'kml_path': KML_PATH, 'prep_mask_path': MASK_PATH_ICE_SHELVES},
     {'name': 'AmundsenSea', 'kml_path': KML_PATH, 'prep_mask_path': MASK_PATH_ICE_SHELVES},
     {'name': 'BellingshausenSea', 'kml_path': KML_PATH, 'prep_mask_path': MASK_PATH_ICE_SHELVES},
     {'name': 'WeddellSea', 'kml_path': KML_PATH, 'prep_mask_path': MASK_PATH_ICE_SHELVES}  
