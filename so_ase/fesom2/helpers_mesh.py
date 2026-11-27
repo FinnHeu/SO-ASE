@@ -522,29 +522,26 @@ def build_cavity_regional_mask(meshpath, kml_path, name='Filchner-Ronne', which=
     elif which == 'element':
         elem = read_elements(meshpath)
         node_lon, node_lat, node_idx, node_coast = read_nodes(meshpath)
-        if name == 'RossSea':
-            node_lon = lon_to_360(node_lon)
-        lon, lat  = node_lon[elem].mean(axis=1), node_lat[elem].mean(axis=1)
+        tri_lon = node_lon[elem]
+        tri_lon = tri_lon[:, :1] + (tri_lon - tri_lon[:, :1] + 180) % 360 - 180
+        lon, lat  = tri_lon.mean(axis=1), node_lat[elem].mean(axis=1)
         lev_cav = read_element_levels(meshpath, which='cavity', raw=False, python_indexing=False)
         mask_cavity = lev_cav > 1
     else:
         raise ValueError(f"which must be 'node' or 'element', got {which}")
 
     kml_file = f"{kml_path}{name}.kml"        
-    coords = read_kml_coords(kml_file, close_ring=True)
-
-    if name == 'RossSea':
-        lon = lon_to_360(lon)
+    coords = np.array(read_kml_coords(kml_file, close_ring=True))
+    steps = (np.diff(coords[:, 0]) + 180) % 360 - 180
+    if abs(steps.sum()) > 180:
+        raise ValueError(f"{kml_file} encircles a pole; use build_regional_mask(polar='south' or 'north') for it")
+    poly_lon = coords[0, 0] + np.concatenate([[0], np.cumsum(steps)])
     #    coords = [(i+360, j) for i, j in coords if i < 0]
         
-    polygon = sh.Polygon(coords)
-    mask_region = mask_cavity.copy()
-    for i, b in enumerate(mask_cavity):
-        if b:
-            point = sh.Point((lon[i], lat[i]))
-            if not polygon.contains(point):
-                mask_region[i] = False
-
+    center = (poly_lon.min() + poly_lon.max()) / 2
+    lon = lon + 360 * np.round((center - lon) / 360)
+    polygon = sh.Polygon(np.column_stack([poly_lon, coords[:, 1]]))
+    mask_region = mask_cavity & shapely.contains_xy(polygon, lon, lat)
     return mask_region
 
 def get_node_mask(meshpath, mask):

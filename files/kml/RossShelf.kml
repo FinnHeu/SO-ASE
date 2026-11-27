@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:ex="http://earth.google.com/kml/ext">
+<Document id="document">
+	<ex:extension>base64;CooBCoEBCn8KAggBEnkKdwokCiAKAwjQDxoHCNLtZRD_ASEAAAAAAADwPykAAAAAAAAAABgAEg8KCAitgO8HEP8BEKAfGAAaGgoHCP___wcQQBIICK2A7wcQ_wEYoB8gACgAIgkIARIFCP___wcqFwgBEggI____BxD_ARkAAAAAAADwPyAAEgQIARAA</ex:extension>
+	<name>RossShelf</name>
+	<gx:CascadingStyle kml:id="__managed_style_04CCFF292A434D770F14_highlight">
+		<ex:extension>base64;EgIYAQ</ex:extension>
+		<Style>
+			<IconStyle>
+				<scale>1.2</scale>
+				<Icon>
+					<href>https://earth.google.com/earth/document/icon?color=1976d2&amp;id=2000&amp;scale=4</href>
+				</Icon>
+				<hotSpot x="64" y="128" xunits="pixels" yunits="insetPixels"/>
+			</IconStyle>
+			<LabelStyle>
+			</LabelStyle>
+			<LineStyle>
+				<color>ff2dc0fb</color>
+				<width>6</width>
+			</LineStyle>
+			<PolyStyle>
+				<color>40ffffff</color>
+			</PolyStyle>
+			<BalloonStyle>
+				<displayMode>hide</displayMode>
+			</BalloonStyle>
+		</Style>
+	</gx:CascadingStyle>
+	<gx:CascadingStyle kml:id="__managed_style_04CCFF292A434D770F14_normal">
+		<ex:extension>base64;EgIYAQ</ex:extension>
+		<Style>
+			<IconStyle>
+				<Icon>
+					<href>https://earth.google.com/earth/document/icon?color=1976d2&amp;id=2000&amp;scale=4</href>
+				</Icon>
+				<hotSpot x="64" y="128" xunits="pixels" yunits="insetPixels"/>
+			</IconStyle>
+			<LabelStyle>
+			</LabelStyle>
+			<LineStyle>
+				<color>ff2dc0fb</color>
+				<width>4</width>
+			</LineStyle>
+			<PolyStyle>
+				<color>40ffffff</color>
+			</PolyStyle>
+			<BalloonStyle>
+				<displayMode>hide</displayMode>
+			</BalloonStyle>
+		</Style>
+	</gx:CascadingStyle>
+	<StyleMap id="__managed_style_04CCFF292A434D770F14">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#__managed_style_04CCFF292A434D770F14_normal</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#__managed_style_04CCFF292A434D770F14_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Placemark id="0C6F66F6D0434D770EFC">
+		<name>Untitled path</name>
+		<LookAt>
+			<longitude>-156.9647631517107</longitude>
+			<latitude>-82.14447115537394</latitude>
+			<altitude>1937.376510417423</altitude>
+			<heading>146.8872663182954</heading>
+			<tilt>0</tilt>
+			<gx:fovy>35</gx:fovy>
+			<range>4382603.391950727</range>
+			<altitudeMode>absolute</altitudeMode>
+		</LookAt>
+		<styleUrl>#__managed_style_04CCFF292A434D770F14</styleUrl>
+		<LineString>
+			<coordinates>
+				-158.1222340174938,-77.68915297913078,0 -174.6642345042388,-76.95789690758528,0 168.8845216846225,-76.97883642892414,0 160.4981807061828,-77.61811083277776,0 156.4940804003862,-79.73947441322267,0 155.1590423342292,-82.47335045221985,0 168.2356263640812,-84.98500489936072,0 -159.2983391314536,-86.71868332105133,0 -138.9171505212624,-84.30080687154452,0 -142.6703888294659,-81.40284546784143,0 -149.1578528340027,-79.22783324544352,0 -152.7919808351478,-78.62213303793929,0 
+			</coordinates>
+		</LineString>
+	</Placemark>
+</Document>
+</kml>
